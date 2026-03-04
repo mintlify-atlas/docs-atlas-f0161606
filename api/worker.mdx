@@ -1,0 +1,234 @@
+---
+title: Worker
+description: Worker class represents a Web Worker or Service Worker
+---
+
+The Worker class represents a [WebWorker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) or [Service Worker](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API). Worker event is emitted on the page object to signal a worker creation.
+
+```typescript
+page.on('worker', worker => {
+  console.log(`Worker created: ${worker.url()}`);
+});
+```
+
+## Events
+
+### close
+
+Emitted when the worker is closed.
+
+```typescript
+worker.on('close', worker => {
+  console.log('Worker closed');
+});
+```
+
+### console
+
+Emitted when JavaScript within the worker calls `console.log` or other console API methods.
+
+```typescript
+worker.on('console', msg => {
+  console.log(`Worker console: ${msg.text()}`);
+});
+```
+
+<Note>
+  You need to subscribe to the 'console' event before the worker sends any console messages.
+</Note>
+
+## Methods
+
+### url
+
+Returns the URL of the worker.
+
+**Returns:** `string` - Worker URL
+
+```typescript
+page.on('worker', worker => {
+  console.log(`Worker URL: ${worker.url()}`);
+});
+```
+
+### evaluate
+
+Evaluates a function in the worker context.
+
+<ParamField path="pageFunction" type="function" required>
+  Function to be evaluated in the worker context
+</ParamField>
+
+<ParamField path="arg" type="any">
+  Optional argument to pass to the function
+</ParamField>
+
+**Returns:** `Promise<R>` - Promise that resolves to the return value
+
+```typescript
+const worker = await page.waitForEvent('worker');
+const result = await worker.evaluate(() => {
+  return self.location.href;
+});
+console.log(result);
+```
+
+### evaluateHandle
+
+Evaluates a function in the worker context and returns a JSHandle.
+
+<ParamField path="pageFunction" type="function" required>
+  Function to be evaluated
+</ParamField>
+
+<ParamField path="arg" type="any">
+  Optional argument to pass to the function
+</ParamField>
+
+**Returns:** `Promise<JSHandle>` - Promise that resolves to a JSHandle
+
+```typescript
+const workerHandle = await worker.evaluateHandle(() => self);
+```
+
+### waitForEvent
+
+Waits for an event to fire and returns its value.
+
+<ParamField path="event" type="string" required>
+  Event name (e.g., 'close', 'console')
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional waiting parameters
+</ParamField>
+
+**Returns:** `Promise<any>` - Promise that resolves to the event data
+
+```typescript
+const closePromise = worker.waitForEvent('close');
+// ... do something that closes the worker
+await closePromise;
+```
+
+## Examples
+
+### Monitoring worker creation
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('monitor workers', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Listen for workers
+  page.on('worker', worker => {
+    console.log(`Worker created: ${worker.url()}`);
+    
+    // Listen for console messages from worker
+    worker.on('console', msg => {
+      console.log(`Worker console: ${msg.text()}`);
+    });
+    
+    // Listen for worker close
+    worker.on('close', () => {
+      console.log('Worker terminated');
+    });
+  });
+  
+  // Trigger worker creation
+  await page.evaluate(() => {
+    new Worker('/worker.js');
+  });
+});
+```
+
+### Communicating with workers
+
+```typescript
+test('communicate with worker', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const workerPromise = page.waitForEvent('worker');
+  
+  await page.evaluate(() => {
+    const worker = new Worker('/worker.js');
+    worker.postMessage({ type: 'start', value: 42 });
+  });
+  
+  const worker = await workerPromise;
+  
+  // Evaluate code in worker context
+  const result = await worker.evaluate(() => {
+    return 'Worker is running';
+  });
+  
+  console.log(result);
+});
+```
+
+### Testing Service Workers
+
+```typescript
+test('service worker', async ({ page, context }) => {
+  await context.grantPermissions(['notifications']);
+  await page.goto('https://example.com');
+  
+  // Register service worker
+  await page.evaluate(() => {
+    return navigator.serviceWorker.register('/sw.js');
+  });
+  
+  // Wait for service worker
+  const serviceWorker = await context.waitForEvent('serviceworker');
+  console.log(`Service worker URL: ${serviceWorker.url()}`);
+  
+  // Evaluate in service worker context
+  const swVersion = await serviceWorker.evaluate(() => {
+    return self.registration.scope;
+  });
+  
+  console.log(`Service worker scope: ${swVersion}`);
+});
+```
+
+### Accessing worker from page
+
+```typescript
+test('access workers from page', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Create a worker
+  await page.evaluate(() => {
+    new Worker('/worker.js');
+  });
+  
+  // Wait for worker to be created
+  await page.waitForEvent('worker');
+  
+  // Access workers
+  const workers = page.workers();
+  console.log(`Active workers: ${workers.length}`);
+  
+  for (const worker of workers) {
+    console.log(`Worker URL: ${worker.url()}`);
+  }
+});
+```
+
+## Best practices
+
+<Tip>
+  Always set up event listeners (`console`, `close`) before the worker is created to avoid missing events.
+</Tip>
+
+<Warning>
+  Workers run in a separate execution context from the page. They don't have access to the DOM or the page's JavaScript scope.
+</Warning>
+
+## Related
+
+- [Page.workers()](/api/page#workers) - Get all workers for a page
+- [BrowserContext.serviceWorkers()](/api/browser-context#serviceworkers) - Get service workers
+- [Page.waitForEvent('worker')](/api/page#waitforevent) - Wait for worker creation
+- [ConsoleMessage](/api/console-message) - Console message from worker

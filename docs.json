@@ -168,7 +168,9 @@
               "api/console-message",
               "api/dialog",
               "api/download",
-              "api/file-chooser"
+              "api/file-chooser",
+              "api/js-handle",
+              "api/worker"
             ]
           }
         ]

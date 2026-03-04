@@ -1,0 +1,191 @@
+---
+title: JSHandle
+description: JSHandle represents an in-page JavaScript object reference
+---
+
+JSHandle represents an in-page JavaScript object. JSHandles can be created with the `page.evaluateHandle()` method.
+
+```typescript
+const windowHandle = await page.evaluateHandle(() => window);
+```
+
+JSHandle prevents the referenced JavaScript object from being garbage collected unless the handle is disposed. JSHandles are automatically disposed when their origin frame gets navigated or the parent context gets destroyed.
+
+JSHandle instances can be used as arguments for `page.evaluate()`.
+
+## Methods
+
+### evaluate
+
+Evaluates a function in the browser context with this handle as the first argument.
+
+<ParamField path="pageFunction" type="function" required>
+  Function to be evaluated in the page context
+</ParamField>
+
+<ParamField path="arg" type="any">
+  Optional argument to pass to the function
+</ParamField>
+
+**Returns:** `Promise<R>` - Promise that resolves to the return value of the function
+
+```typescript
+const tweetHandle = await page.evaluateHandle(() => document.querySelector('.tweet'));
+const text = await tweetHandle.evaluate(node => node.innerText);
+```
+
+### evaluateHandle
+
+Evaluates a function in the browser context with this handle as the first argument, returns a JSHandle.
+
+<ParamField path="pageFunction" type="function" required>
+  Function to be evaluated
+</ParamField>
+
+<ParamField path="arg" type="any">
+  Optional argument to pass to the function
+</ParamField>
+
+**Returns:** `Promise<JSHandle>` - Promise that resolves to a JSHandle
+
+```typescript
+const aHandle = await page.evaluateHandle(() => document.body);
+const bHandle = await aHandle.evaluateHandle(body => body.firstChild);
+```
+
+### getProperty
+
+Fetches a single property from the referenced object.
+
+<ParamField path="propertyName" type="string" required>
+  Name of the property to get
+</ParamField>
+
+**Returns:** `Promise<JSHandle>` - Promise that resolves to a JSHandle of the property value
+
+```typescript
+const handle = await page.evaluateHandle(() => ({ foo: 'bar' }));
+const fooHandle = await handle.getProperty('foo');
+const fooValue = await fooHandle.jsonValue();
+console.log(fooValue); // 'bar'
+```
+
+### getProperties
+
+Returns a map with property names as keys and JSHandle instances for property values.
+
+**Returns:** `Promise<Map<string, JSHandle>>` - Map of property names to JSHandles
+
+```typescript
+const handle = await page.evaluateHandle(() => ({ a: 1, b: 'two' }));
+const map = await handle.getProperties();
+const aHandle = map.get('a');
+const aValue = await aHandle.jsonValue();
+console.log(aValue); // 1
+```
+
+### jsonValue
+
+Returns a JSON representation of the object. If the object has a `toJSON` function, it will not be called.
+
+**Returns:** `Promise<T>` - JSON representation of the object
+
+```typescript
+const handle = await page.evaluateHandle(() => ({ foo: 'bar' }));
+const json = await handle.jsonValue();
+console.log(json); // { foo: 'bar' }
+```
+
+<Warning>
+  The method will throw an error if the referenced object is not stringifiable. It will also throw if the object has circular references.
+</Warning>
+
+### asElement
+
+Returns either `null` or the object handle itself if the object is an instance of `Node`.
+
+**Returns:** `ElementHandle | null` - ElementHandle pointing to the referenced object or `null`
+
+```typescript
+const handle = await page.evaluateHandle(() => document.body);
+const element = handle.asElement();
+// element is an ElementHandle
+```
+
+### dispose
+
+Stops referencing the element handle and disposes it.
+
+**Returns:** `Promise<void>`
+
+```typescript
+const handle = await page.evaluateHandle(() => document.body);
+await handle.dispose();
+```
+
+## Examples
+
+### Working with object properties
+
+```typescript
+import { test } from '@playwright/test';
+
+test('extract object properties', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const handle = await page.evaluateHandle(() => ({
+    name: 'John',
+    age: 30,
+    address: { city: 'New York' }
+  }));
+  
+  // Get all properties
+  const properties = await handle.getProperties();
+  const nameHandle = properties.get('name');
+  const name = await nameHandle.jsonValue();
+  console.log(name); // 'John'
+  
+  // Get nested property
+  const addressHandle = properties.get('address');
+  const address = await addressHandle.jsonValue();
+  console.log(address); // { city: 'New York' }
+  
+  await handle.dispose();
+});
+```
+
+### Passing JSHandles to evaluate
+
+```typescript
+const aHandle = await page.evaluateHandle(() => document.body);
+const resultHandle = await page.evaluateHandle(
+  ([body, suffix]) => body.textContent + suffix,
+  [aHandle, ' - modified']
+);
+const result = await resultHandle.jsonValue();
+console.log(result);
+await aHandle.dispose();
+await resultHandle.dispose();
+```
+
+### Working with arrays
+
+```typescript
+const arrayHandle = await page.evaluateHandle(() => [1, 2, 3]);
+
+// Get array length
+const length = await arrayHandle.evaluate(arr => arr.length);
+console.log(length); // 3
+
+// Get array values
+const values = await arrayHandle.jsonValue();
+console.log(values); // [1, 2, 3]
+
+await arrayHandle.dispose();
+```
+
+## Related
+
+- [Page.evaluateHandle()](/api/page#evaluatehandle) - Create a JSHandle
+- [ElementHandle](/api/element-handle) - Subclass representing DOM elements
+- [Frame.evaluateHandle()](/api/frame#evaluatehandle) - Evaluate and get JSHandle in frame
