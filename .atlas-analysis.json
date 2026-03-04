@@ -1,0 +1,195 @@
+{
+  "projectType": "framework",
+  "projectName": "Playwright",
+  "projectDescription": "A framework for Web Testing and Automation that enables cross-browser testing with a single API.",
+  "theme": "aspen",
+  "primaryColor": "#d88982",
+  "lightColor": "#889aa4",
+  "darkColor": "#31654c",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart",
+              "writing-tests"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/architecture",
+              "core-concepts/browsers",
+              "core-concepts/browser-contexts",
+              "core-concepts/pages-and-frames",
+              "core-concepts/selectors",
+              "core-concepts/auto-waiting",
+              "core-concepts/test-isolation"
+            ]
+          },
+          {
+            "group": "Test Runner",
+            "pages": [
+              "test-runner/overview",
+              "test-runner/configuration",
+              "test-runner/test-fixtures",
+              "test-runner/assertions",
+              "test-runner/test-hooks",
+              "test-runner/parallelization",
+              "test-runner/retries"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/authentication",
+              "guides/network-mocking",
+              "guides/screenshots-and-videos",
+              "guides/mobile-emulation",
+              "guides/api-testing",
+              "guides/component-testing",
+              "guides/debugging",
+              "guides/continuous-integration"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "tools/codegen",
+              "tools/inspector",
+              "tools/trace-viewer",
+              "tools/ui-mode"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/custom-reporters",
+              "advanced/browser-contexts-advanced",
+              "advanced/network-interception",
+              "advanced/accessibility-testing",
+              "advanced/visual-comparisons"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview"
+            ]
+          },
+          {
+            "group": "Test API",
+            "pages": [
+              "api/test",
+              "api/test-fixtures",
+              "api/test-config"
+            ]
+          },
+          {
+            "group": "Core Classes",
+            "pages": [
+              "api/playwright",
+              "api/browser-type",
+              "api/browser",
+              "api/browser-context",
+              "api/page",
+              "api/frame",
+              "api/locator",
+              "api/element-handle"
+            ]
+          },
+          {
+            "group": "Input & Interaction",
+            "pages": [
+              "api/mouse",
+              "api/keyboard",
+              "api/touchscreen"
+            ]
+          },
+          {
+            "group": "Network",
+            "pages": [
+              "api/request",
+              "api/response",
+              "api/route",
+              "api/websocket",
+              "api/api-request-context"
+            ]
+          },
+          {
+            "group": "Testing Utilities",
+            "pages": [
+              "api/assertions",
+              "api/clock",
+              "api/coverage",
+              "api/tracing",
+              "api/video"
+            ]
+          },
+          {
+            "group": "Reporters",
+            "pages": [
+              "api/reporters",
+              "api/test-reporter"
+            ]
+          },
+          {
+            "group": "Misc",
+            "pages": [
+              "api/selectors",
+              "api/accessibility",
+              "api/console-message",
+              "api/dialog",
+              "api/download",
+              "api/file-chooser"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Cross-browser testing (Chromium, Firefox, WebKit)",
+    "Auto-waiting and web-first assertions",
+    "Full test isolation with browser contexts",
+    "Powerful debugging tools (Inspector, Trace Viewer)",
+    "Network interception and mocking",
+    "Mobile device emulation",
+    "Component testing for React and Vue",
+    "API testing capabilities",
+    "Parallel test execution",
+    "Built-in test retries and screenshots"
+  ],
+  "publicApiSurface": [
+    "test()",
+    "expect()",
+    "playwright.chromium",
+    "playwright.firefox",
+    "playwright.webkit",
+    "BrowserType.launch()",
+    "Browser.newContext()",
+    "BrowserContext.newPage()",
+    "Page.goto()",
+    "Page.click()",
+    "Page.fill()",
+    "Page.locator()",
+    "Locator.click()",
+    "Page.screenshot()",
+    "Page.route()",
+    "APIRequestContext.get()",
+    "test.beforeEach()",
+    "test.describe()",
+    "Page.waitForSelector()",
+    "Page.evaluate()"
+  ]
+}
