@@ -1,0 +1,345 @@
+---
+title: APIRequestContext
+description: API reference for the Playwright APIRequestContext class for making HTTP requests.
+---
+
+The APIRequestContext class provides methods to make HTTP API requests independently of browser pages. It's useful for API testing, authentication setup, and backend operations.
+
+## Creation
+
+```javascript
+const request = await playwright.request.newContext({
+  baseURL: 'https://api.example.com',
+  extraHTTPHeaders: {
+    'Authorization': 'Bearer token'
+  }
+});
+```
+
+## Methods
+
+### fetch
+
+Makes an HTTP request.
+
+```javascript
+const response = await request.fetch('https://api.example.com/users');
+const response = await request.fetch('https://api.example.com/users', {
+  method: 'POST',
+  data: { name: 'John' }
+});
+```
+
+<ParamField path="url" type="string" required>
+  Request URL. Can be relative if `baseURL` was set.
+</ParamField>
+
+<ParamField path="options.method" type="string">
+  HTTP method. Defaults to 'GET'.
+</ParamField>
+
+<ParamField path="options.params" type="Object | URLSearchParams | string">
+  Query parameters to append to URL.
+</ParamField>
+
+<ParamField path="options.headers" type="Object">
+  Request headers.
+</ParamField>
+
+<ParamField path="options.data" type="string | Buffer | object">
+  Request body. Objects will be serialized to JSON.
+</ParamField>
+
+<ParamField path="options.form" type="Object | FormData">
+  Form-encoded data. Sets `content-type` to `application/x-www-form-urlencoded`.
+</ParamField>
+
+<ParamField path="options.multipart" type="Object | FormData">
+  Multipart form data. Sets `content-type` to `multipart/form-data`.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Request timeout in milliseconds.
+</ParamField>
+
+<ParamField path="options.failOnStatusCode" type="boolean">
+  Whether to throw on non-2xx status codes. Defaults to false.
+</ParamField>
+
+<ParamField path="options.ignoreHTTPSErrors" type="boolean">
+  Whether to ignore HTTPS errors. Defaults to false.
+</ParamField>
+
+<ParamField path="options.maxRedirects" type="number">
+  Maximum number of redirects to follow. Defaults to 20.
+</ParamField>
+
+<ParamField path="options.maxRetries" type="number">
+  Maximum number of retries. Defaults to 0.
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+---
+
+### get
+
+Makes a GET request.
+
+```javascript
+const response = await request.get('https://api.example.com/users');
+const response = await request.get('users', {
+  params: { page: 1, limit: 10 }
+});
+```
+
+<ParamField path="url" type="string" required>
+  Request URL
+</ParamField>
+
+<ParamField path="options" type="Object">
+  Same options as `fetch()` except `method`
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+---
+
+### post
+
+Makes a POST request.
+
+```javascript
+const response = await request.post('https://api.example.com/users', {
+  data: { name: 'John', email: 'john@example.com' }
+});
+```
+
+<ParamField path="url" type="string" required>
+  Request URL
+</ParamField>
+
+<ParamField path="options" type="Object">
+  Same options as `fetch()` except `method`
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+---
+
+### put
+
+Makes a PUT request.
+
+```javascript
+const response = await request.put('https://api.example.com/users/1', {
+  data: { name: 'John Doe' }
+});
+```
+
+<ParamField path="url" type="string" required>
+  Request URL
+</ParamField>
+
+<ParamField path="options" type="Object">
+  Same options as `fetch()` except `method`
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+---
+
+### patch
+
+Makes a PATCH request.
+
+```javascript
+const response = await request.patch('https://api.example.com/users/1', {
+  data: { email: 'newemail@example.com' }
+});
+```
+
+<ParamField path="url" type="string" required>
+  Request URL
+</ParamField>
+
+<ParamField path="options" type="Object">
+  Same options as `fetch()` except `method`
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+---
+
+### delete
+
+Makes a DELETE request.
+
+```javascript
+const response = await request.delete('https://api.example.com/users/1');
+```
+
+<ParamField path="url" type="string" required>
+  Request URL
+</ParamField>
+
+<ParamField path="options" type="Object">
+  Same options as `fetch()` except `method`
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+---
+
+### head
+
+Makes a HEAD request.
+
+```javascript
+const response = await request.head('https://api.example.com/users');
+```
+
+<ParamField path="url" type="string" required>
+  Request URL
+</ParamField>
+
+<ParamField path="options" type="Object">
+  Same options as `fetch()` except `method`
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+---
+
+### storageState
+
+Returns storage state for this context.
+
+```javascript
+const state = await request.storageState();
+await request.storageState({ path: 'storage.json' });
+```
+
+<ParamField path="options.path" type="string">
+  File path to save storage state to.
+</ParamField>
+
+<ParamField path="options.indexedDB" type="boolean">
+  Whether to include IndexedDB data. Defaults to false.
+</ParamField>
+
+**Returns:** `Promise<Object>`
+
+---
+
+### dispose
+
+Disposes the request context and closes all resources.
+
+```javascript
+await request.dispose();
+await request.dispose({ reason: 'Test completed' });
+```
+
+<ParamField path="options.reason" type="string">
+  Optional reason for disposal.
+</ParamField>
+
+## Example Usage
+
+### Create Context with Authentication
+
+```javascript
+const request = await playwright.request.newContext({
+  baseURL: 'https://api.example.com',
+  extraHTTPHeaders: {
+    'Authorization': 'Bearer token123'
+  }
+});
+```
+
+### Make API Request
+
+```javascript
+const response = await request.get('/users');
+const users = await response.json();
+console.log(users);
+```
+
+### POST with JSON Data
+
+```javascript
+const response = await request.post('/users', {
+  data: {
+    name: 'John Doe',
+    email: 'john@example.com'
+  }
+});
+
+if (response.ok()) {
+  const user = await response.json();
+  console.log('Created user:', user);
+}
+```
+
+### Upload File
+
+```javascript
+const response = await request.post('/upload', {
+  multipart: {
+    file: {
+      name: 'image.png',
+      mimeType: 'image/png',
+      buffer: fs.readFileSync('image.png')
+    }
+  }
+});
+```
+
+### Handle Query Parameters
+
+```javascript
+const response = await request.get('/search', {
+  params: {
+    q: 'playwright',
+    page: 1,
+    limit: 20
+  }
+});
+```
+
+### Setup Authentication Before Tests
+
+```javascript
+const request = await playwright.request.newContext();
+
+const response = await request.post('https://api.example.com/login', {
+  data: {
+    username: 'user',
+    password: 'pass'
+  }
+});
+
+const token = (await response.json()).token;
+
+// Use token in browser context
+const context = await browser.newContext({
+  extraHTTPHeaders: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+```
+
+### Save and Restore Storage State
+
+```javascript
+// Save storage state
+const request = await playwright.request.newContext();
+await request.post('/login', { data: credentials });
+await request.storageState({ path: 'auth.json' });
+
+// Restore storage state
+const request2 = await playwright.request.newContext({
+  storageState: 'auth.json'
+});
+```

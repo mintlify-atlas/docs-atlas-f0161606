@@ -1,0 +1,305 @@
+---
+title: Test Reporter API
+description: Interface for creating custom test reporters in Playwright
+---
+
+The Reporter interface allows you to create custom reporters that receive notifications about test execution events. Implement this interface to build reporters that format test results according to your needs.
+
+## Creating a Custom Reporter
+
+```typescript
+// my-reporter.ts
+import type {
+  Reporter,
+  FullConfig,
+  Suite,
+  TestCase,
+  TestResult,
+  FullResult,
+} from '@playwright/test/reporter';
+
+class MyReporter implements Reporter {
+  onBegin(config: FullConfig, suite: Suite) {
+    console.log(`Starting test run with ${suite.allTests().length} tests`);
+  }
+
+  onTestBegin(test: TestCase, result: TestResult) {
+    console.log(`Starting test: ${test.title}`);
+  }
+
+  onTestEnd(test: TestCase, result: TestResult) {
+    console.log(`Finished test: ${test.title} - ${result.status}`);
+  }
+
+  onEnd(result: FullResult) {
+    console.log(`Test run finished: ${result.status}`);
+  }
+}
+
+export default MyReporter;
+```
+
+Configure the reporter:
+
+```typescript
+// playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  reporter: './my-reporter.ts',
+});
+```
+
+## Reporter Interface
+
+All methods are optional. Implement only the events you need.
+
+### onBegin(config, suite)
+
+Called once before running tests. All tests have been discovered and organized into a suite hierarchy.
+
+<ParamField path="config" type="FullConfig">
+  Resolved test configuration
+</ParamField>
+
+<ParamField path="suite" type="Suite">
+  Root suite containing all projects, files, and test cases
+</ParamField>
+
+```typescript
+onBegin(config: FullConfig, suite: Suite): void {
+  console.log(`Running ${suite.allTests().length} tests`);
+  console.log(`Workers: ${config.workers}`);
+}
+```
+
+### onTestBegin(test, result)
+
+Called when a test begins execution.
+
+<ParamField path="test" type="TestCase">
+  The test that is starting
+</ParamField>
+
+<ParamField path="result" type="TestResult">
+  Test result object (initially empty, populated during execution)
+</ParamField>
+
+```typescript
+onTestBegin(test: TestCase, result: TestResult): void {
+  console.log(`Test started: ${test.title}`);
+}
+```
+
+### onStdOut(chunk, test, result)
+
+Called when the worker process writes to stdout.
+
+<ParamField path="chunk" type="string | Buffer">
+  Output data
+</ParamField>
+
+<ParamField path="test" type="TestCase | undefined">
+  Test that was running (may be undefined if output occurred outside a test)
+</ParamField>
+
+<ParamField path="result" type="TestResult | undefined">
+  Test result object (may be undefined)
+</ParamField>
+
+### onStdErr(chunk, test, result)
+
+Called when the worker process writes to stderr.
+
+<ParamField path="chunk" type="string | Buffer">
+  Error output data
+</ParamField>
+
+<ParamField path="test" type="TestCase | undefined">
+  Test that was running (may be undefined)
+</ParamField>
+
+<ParamField path="result" type="TestResult | undefined">
+  Test result object (may be undefined)
+</ParamField>
+
+### onStepBegin(test, result, step)
+
+Called when a test step begins.
+
+<ParamField path="test" type="TestCase">
+  The test containing this step
+</ParamField>
+
+<ParamField path="result" type="TestResult">
+  Test result object
+</ParamField>
+
+<ParamField path="step" type="TestStep">
+  The step that is starting
+</ParamField>
+
+### onStepEnd(test, result, step)
+
+Called when a test step completes.
+
+<ParamField path="test" type="TestCase">
+  The test containing this step
+</ParamField>
+
+<ParamField path="result" type="TestResult">
+  Test result object
+</ParamField>
+
+<ParamField path="step" type="TestStep">
+  The completed step
+</ParamField>
+
+### onTestEnd(test, result)
+
+Called when a test completes. The result object is fully populated at this point.
+
+<ParamField path="test" type="TestCase">
+  The completed test
+</ParamField>
+
+<ParamField path="result" type="TestResult">
+  Complete test result with status, errors, and timing
+</ParamField>
+
+```typescript
+onTestEnd(test: TestCase, result: TestResult): void {
+  console.log(`Test ${test.title}: ${result.status}`);
+  console.log(`Duration: ${result.duration}ms`);
+  if (result.error) {
+    console.log(`Error: ${result.error.message}`);
+  }
+}
+```
+
+### onError(error)
+
+Called on global errors that occur outside of test execution.
+
+<ParamField path="error" type="TestError">
+  Error object with message and optional stack trace
+</ParamField>
+
+```typescript
+onError(error: TestError): void {
+  console.error(`Global error: ${error.message}`);
+}
+```
+
+### onEnd(result)
+
+Called after all tests have finished or testing was interrupted. Can return a Promise.
+
+<ParamField path="result" type="FullResult">
+  Overall test run result
+</ParamField>
+
+**Returns:** `Promise<{ status?: FullResult['status'] }> | void`
+
+Reporters can override the final status:
+
+```typescript
+async onEnd(result: FullResult) {
+  console.log(`Test run ${result.status}`);
+  console.log(`Duration: ${result.duration}ms`);
+  
+  // Override status based on custom criteria
+  if (someCustomCondition) {
+    return { status: 'failed' };
+  }
+}
+```
+
+### onExit()
+
+Called immediately before the test runner exits. All reporters have received `onEnd` at this point.
+
+```typescript
+async onExit(): Promise<void> {
+  // Upload reports or perform cleanup
+  await uploadReports();
+}
+```
+
+### printsToStdio()
+
+Indicates whether the reporter outputs to stdout/stderr.
+
+**Returns:** `boolean`
+
+Return `false` if your reporter doesn't print to the terminal. Playwright will use a standard terminal reporter alongside your custom reporter.
+
+```typescript
+printsToStdio(): boolean {
+  return false; // This reporter only writes to files
+}
+```
+
+## Event Order
+
+Typical sequence of reporter calls:
+
+1. `onBegin(config, suite)` - Called once with the root suite
+2. For each test:
+   - `onTestBegin(test, result)` - Test starts
+   - `onStepBegin(test, result, step)` - Each step starts
+   - `onStepEnd(test, result, step)` - Each step completes
+   - `onStdOut(chunk, test, result)` - Any stdout output
+   - `onStdErr(chunk, test, result)` - Any stderr output
+   - `onTestEnd(test, result)` - Test completes
+3. `onError(error)` - Any global errors
+4. `onEnd(result)` - All tests finished
+5. `onExit()` - Before runner exits
+
+## Merged Reports
+
+When using the `blob` reporter with `merge-reports`, the same Reporter API is called. Key differences:
+
+- Projects from different shards are kept as separate `TestProject` objects
+- If a project was sharded across 5 machines, there will be 5 project instances with the same name
+
+## Error Handling
+
+Playwright swallows errors thrown in reporter methods. If you need error detection:
+
+```typescript
+class MyReporter implements Reporter {
+  private errors: Error[] = [];
+
+  onTestEnd(test: TestCase, result: TestResult) {
+    try {
+      // Your reporter logic
+      this.processTest(test, result);
+    } catch (error) {
+      this.errors.push(error);
+    }
+  }
+
+  async onEnd(result: FullResult) {
+    if (this.errors.length > 0) {
+      console.error('Reporter errors:', this.errors);
+      return { status: 'failed' };
+    }
+  }
+}
+```
+
+## Full Result Status
+
+The `status` field in `FullResult` can be:
+
+- `'passed'` - All tests passed as expected
+- `'failed'` - At least one test failed
+- `'timedout'` - Global timeout reached
+- `'interrupted'` - User interrupted the run
+
+## Related
+
+- [Built-in Reporters](/api/reporters) - Available reporter options
+- [TestCase](/api/test-case) - Test case API reference
+- [TestResult](/api/test-result) - Test result API reference

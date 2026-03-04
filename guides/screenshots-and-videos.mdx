@@ -1,0 +1,417 @@
+---
+title: 'Screenshots and Videos'
+description: 'Capture screenshots and record videos of your Playwright tests for debugging and visual regression testing'
+---
+
+## Overview
+
+Playwright can capture screenshots and record videos of your tests, providing visual evidence of test execution and helping debug failures.
+
+## Screenshots
+
+### Full Page Screenshot
+
+Capture a screenshot of the entire page:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('capture full page', async ({ page }) => {
+  await page.goto('https://example.com');
+  await page.screenshot({ 
+    path: 'screenshot.png',
+    fullPage: true 
+  });
+});
+```
+
+### Element Screenshot
+
+Capture a screenshot of a specific element:
+
+```typescript
+test('capture element', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const element = page.locator('.main-content');
+  await element.screenshot({ path: 'element.png' });
+});
+```
+
+### Screenshot Options
+
+<CodeGroup>
+```typescript Basic Options
+await page.screenshot({
+  path: 'screenshot.png',
+  fullPage: true,
+  type: 'png', // 'png' or 'jpeg'
+  quality: 100, // 0-100 (jpeg only)
+});
+```
+
+```typescript Advanced Options
+await page.screenshot({
+  path: 'screenshot.png',
+  clip: {
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+  },
+  omitBackground: true, // Transparent background
+  caret: 'hide', // Hide text caret
+});
+```
+
+```typescript Mask Elements
+await page.screenshot({
+  path: 'screenshot.png',
+  mask: [page.locator('.ad'), page.locator('.popup')],
+});
+```
+</CodeGroup>
+
+## Visual Regression Testing
+
+### Compare Screenshots
+
+Playwright includes built-in visual comparison:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('visual regression', async ({ page }) => {
+  await page.goto('https://example.com');
+  await expect(page).toHaveScreenshot('homepage.png');
+});
+```
+
+### Update Baseline Screenshots
+
+When intentional UI changes are made, update baselines:
+
+```bash
+npx playwright test --update-snapshots
+```
+
+### Configure Visual Comparison
+
+Customize comparison tolerance in `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixels: 100,
+      maxDiffPixelRatio: 0.1,
+      threshold: 0.2,
+    },
+  },
+});
+```
+
+## Video Recording
+
+### Configure Video Recording
+
+Enable video recording in your configuration:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    video: 'on', // Record all tests
+    // video: 'retain-on-failure', // Only failed tests
+    // video: 'on-first-retry', // Record on retry
+    videoSize: { width: 1280, height: 720 },
+  },
+});
+```
+
+### Video Recording Options
+
+<Steps>
+  <Step title="Always record">
+    ```typescript
+    use: {
+      video: 'on',
+    }
+    ```
+    Records video for all tests.
+  </Step>
+
+  <Step title="Record failures only">
+    ```typescript
+    use: {
+      video: 'retain-on-failure',
+    }
+    ```
+    Only keeps videos of failed tests.
+  </Step>
+
+  <Step title="Record on retry">
+    ```typescript
+    use: {
+      video: 'on-first-retry',
+    }
+    ```
+    Records when tests are retried.
+  </Step>
+
+  <Step title="Never record">
+    ```typescript
+    use: {
+      video: 'off',
+    }
+    ```
+    Disables video recording.
+  </Step>
+</Steps>
+
+### Access Video Path
+
+Get the video path programmatically:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('with video', async ({ page }) => {
+  await page.goto('https://example.com');
+  // ... test actions ...
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === 'failed') {
+    const videoPath = await page.video()?.path();
+    console.log('Video saved to:', videoPath);
+  }
+});
+```
+
+## Screenshot on Failure
+
+### Automatic Screenshots
+
+Configure automatic screenshots for failed tests:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    screenshot: 'only-on-failure',
+    // screenshot: 'on', // Always capture
+    // screenshot: 'off', // Never capture
+  },
+});
+```
+
+### Custom Failure Handler
+
+Implement custom screenshot logic:
+
+```typescript
+import { test } from '@playwright/test';
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    const screenshot = await page.screenshot();
+    await testInfo.attach('screenshot', { 
+      body: screenshot, 
+      contentType: 'image/png' 
+    });
+  }
+});
+
+test('example test', async ({ page }) => {
+  await page.goto('https://example.com');
+  // Test actions...
+});
+```
+
+## Artifacts Location
+
+Configure where screenshots and videos are saved:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  // Output directory for test artifacts
+  outputDir: 'test-results/',
+  
+  use: {
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+});
+```
+
+## Practical Examples
+
+### Debug Failed Tests
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('checkout flow', async ({ page }) => {
+  await page.goto('https://example.com/shop');
+  
+  // Take screenshot before critical action
+  await page.screenshot({ path: 'before-checkout.png' });
+  
+  await page.click('text=Add to Cart');
+  await page.click('text=Checkout');
+  
+  // Take screenshot after critical action
+  await page.screenshot({ path: 'after-checkout.png' });
+  
+  await expect(page.locator('.success-message')).toBeVisible();
+});
+```
+
+### Visual Testing Workflow
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('homepage visual tests', () => {
+  test('desktop view', async ({ page }) => {
+    await page.goto('https://example.com');
+    await expect(page).toHaveScreenshot('homepage-desktop.png');
+  });
+
+  test('mobile view', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('https://example.com');
+    await expect(page).toHaveScreenshot('homepage-mobile.png');
+  });
+
+  test('dark mode', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('https://example.com');
+    await expect(page).toHaveScreenshot('homepage-dark.png');
+  });
+});
+```
+
+### Hide Dynamic Content
+
+```typescript
+test('stable screenshot', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Hide elements that change frequently
+  await page.screenshot({
+    path: 'stable.png',
+    mask: [
+      page.locator('.timestamp'),
+      page.locator('.ad'),
+      page.locator('.random-content'),
+    ],
+  });
+});
+```
+
+## CI/CD Integration
+
+Store artifacts in CI pipelines for easy access:
+
+<CodeGroup>
+```yaml GitHub Actions
+name: Playwright Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps
+      - run: npx playwright test
+      
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+```
+
+```yaml GitLab CI
+test:
+  image: mcr.microsoft.com/playwright:v1.40.0
+  script:
+    - npm ci
+    - npx playwright test
+  artifacts:
+    when: always
+    paths:
+      - test-results/
+      - playwright-report/
+    expire_in: 1 week
+```
+</CodeGroup>
+
+## Best Practices
+
+<Tip>
+  **Selective Recording**: Use `retain-on-failure` for videos to save disk space while still capturing failures.
+</Tip>
+
+- **Use visual regression for stable UIs**: Only apply visual testing to components with predictable rendering
+- **Mask dynamic content**: Hide timestamps, ads, and random content to reduce false positives
+- **Set appropriate tolerances**: Configure pixel difference thresholds based on your needs
+- **Store artifacts in CI**: Upload screenshots and videos to CI artifacts for easy debugging
+- **Clean up old artifacts**: Implement retention policies to manage disk space
+
+<Warning>
+  Video recording increases test execution time and storage requirements. Use it judiciously in CI/CD pipelines.
+</Warning>
+
+## Troubleshooting
+
+### Screenshots appear blank
+
+Wait for content to load before capturing:
+
+```typescript
+await page.goto('https://example.com');
+await page.waitForLoadState('networkidle');
+await page.screenshot({ path: 'loaded.png' });
+```
+
+### Visual comparison failing unexpectedly
+
+Increase tolerance or update baselines:
+
+```typescript
+await expect(page).toHaveScreenshot('homepage.png', {
+  maxDiffPixels: 500,
+  threshold: 0.3,
+});
+```
+
+### Videos not being saved
+
+Ensure video path is accessible and verify configuration:
+
+```typescript
+test.afterEach(async ({ page }, testInfo) => {
+  const video = page.video();
+  if (video) {
+    const path = await video.path();
+    console.log('Video path:', path);
+  }
+});
+```

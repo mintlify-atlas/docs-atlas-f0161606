@@ -1,0 +1,192 @@
+---
+title: Built-in Reporters
+description: Complete reference for Playwright's built-in test reporters
+---
+
+Playwright Test includes several built-in reporters that provide different ways to view test results. Configure reporters in your `playwright.config.ts` file.
+
+## Available Reporters
+
+### List Reporter
+
+Displays each test on its own line with real-time progress updates.
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  reporter: 'list',
+  // or with options
+  reporter: [['list', { printSteps: true }]],
+});
+```
+
+<ParamField path="printSteps" type="boolean" default="false">
+  Print individual test steps as they execute. Can also be set via `PLAYWRIGHT_LIST_PRINT_STEPS` environment variable.
+</ParamField>
+
+### Line Reporter
+
+A single-line reporter that updates the current test status in place.
+
+```typescript
+export default defineConfig({
+  reporter: 'line',
+});
+```
+
+Best suited for CI environments or when you want minimal output.
+
+### Dot Reporter
+
+A concise reporter that prints a character for each test.
+
+```typescript
+export default defineConfig({
+  reporter: 'dot',
+});
+```
+
+**Symbols:**
+- `.` (green) - Test passed
+- `F` (red) - Test failed
+- `T` (red) - Test timed out
+- `°` (yellow) - Test skipped
+- `±` (yellow) - Flaky test
+- `×` (gray) - Test will retry
+
+### HTML Reporter
+
+Generates an interactive HTML report with detailed test results.
+
+```typescript
+export default defineConfig({
+  reporter: 'html',
+  // or with options
+  reporter: [['html', {
+    outputFolder: 'playwright-report',
+    open: 'never',
+  }]],
+});
+```
+
+<ParamField path="outputFolder" type="string" default="'playwright-report'">
+  Directory for the HTML report. Can be set via `PLAYWRIGHT_HTML_OUTPUT_DIR` environment variable.
+</ParamField>
+
+<ParamField path="open" type="'always' | 'never' | 'on-failure'" default="'on-failure'">
+  When to open the HTML report in a browser. Can be set via `PLAYWRIGHT_HTML_OPEN` environment variable.
+</ParamField>
+
+<ParamField path="host" type="string">
+  Host to bind the report server to. Can be set via `PLAYWRIGHT_HTML_HOST` environment variable.
+</ParamField>
+
+<ParamField path="port" type="number">
+  Port to bind the report server to. Can be set via `PLAYWRIGHT_HTML_PORT` environment variable.
+</ParamField>
+
+<ParamField path="attachmentsBaseURL" type="string" default="'data/'">
+  Base URL for attachments in the report. Can be set via `PLAYWRIGHT_HTML_ATTACHMENTS_BASE_URL` environment variable.
+</ParamField>
+
+### JSON Reporter
+
+Outputs test results in JSON format for programmatic consumption.
+
+```typescript
+export default defineConfig({
+  reporter: [['json', { outputFile: 'results.json' }]],
+});
+```
+
+<ParamField path="outputFile" type="string">
+  Path to the output JSON file. Can be set via `PLAYWRIGHT_JSON_OUTPUT_FILE` environment variable.
+</ParamField>
+
+### JUnit Reporter
+
+Generates a JUnit-compatible XML report.
+
+```typescript
+export default defineConfig({
+  reporter: [['junit', { outputFile: 'results.xml' }]],
+});
+```
+
+<ParamField path="outputFile" type="string">
+  Path to the output XML file. Can be set via `PLAYWRIGHT_JUNIT_OUTPUT_FILE` environment variable.
+</ParamField>
+
+<ParamField path="stripANSIControlSequences" type="boolean" default="false">
+  Remove ANSI control sequences from output. Can be set via `PLAYWRIGHT_JUNIT_STRIP_ANSI` environment variable.
+</ParamField>
+
+<ParamField path="includeProjectInTestName" type="boolean" default="false">
+  Include the project name in test case names. Can be set via `PLAYWRIGHT_JUNIT_INCLUDE_PROJECT_IN_TEST_NAME` environment variable.
+</ParamField>
+
+### GitHub Actions Reporter
+
+Integrates with GitHub Actions to show test results inline.
+
+```typescript
+export default defineConfig({
+  reporter: 'github',
+});
+```
+
+Automatically activated when running in GitHub Actions.
+
+### Blob Reporter
+
+Outputs test results in a binary format for merging reports from sharded test runs.
+
+```typescript
+export default defineConfig({
+  reporter: 'blob',
+});
+```
+
+Used with the `merge-reports` CLI command for parallel test execution across multiple machines.
+
+## Using Multiple Reporters
+
+Combine multiple reporters for different outputs:
+
+```typescript
+export default defineConfig({
+  reporter: [
+    ['list'],
+    ['json', { outputFile: 'test-results.json' }],
+    ['html'],
+  ],
+});
+```
+
+## Environment Variables
+
+Many reporter options can be configured via environment variables:
+
+```bash
+# HTML Reporter
+PLAYWRIGHT_HTML_OUTPUT_DIR=my-report
+PLAYWRIGHT_HTML_OPEN=always
+PLAYWRIGHT_HTML_HOST=0.0.0.0
+PLAYWRIGHT_HTML_PORT=9323
+
+# JSON Reporter
+PLAYWRIGHT_JSON_OUTPUT_FILE=results.json
+
+# JUnit Reporter
+PLAYWRIGHT_JUNIT_OUTPUT_FILE=results.xml
+PLAYWRIGHT_JUNIT_STRIP_ANSI=1
+
+# List Reporter
+PLAYWRIGHT_LIST_PRINT_STEPS=1
+```
+
+## Related
+
+- [Test Reporter API](/api/test-reporter) - Create custom reporters
+- [Configuration](/configuration) - Full configuration reference

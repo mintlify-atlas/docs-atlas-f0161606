@@ -1,0 +1,310 @@
+---
+title: ConsoleMessage
+description: Represents a message logged to the browser console
+---
+
+The ConsoleMessage class represents messages logged by the page to the browser console. Listen for console messages using the `page.on('console')` event.
+
+## Overview
+
+```typescript
+import { test } from '@playwright/test';
+
+test('capture console messages', async ({ page }) => {
+  page.on('console', msg => {
+    console.log(`Console ${msg.type()}: ${msg.text()}`);
+  });
+  
+  await page.goto('https://example.com');
+  await page.evaluate(() => console.log('Hello from the page'));
+});
+```
+
+## Methods
+
+### type()
+
+Get the type of the console message.
+
+**Returns:** `string`
+
+Possible values:
+- `'log'`
+- `'debug'`
+- `'info'`
+- `'error'`
+- `'warning'`
+- `'dir'`
+- `'dirxml'`
+- `'table'`
+- `'trace'`
+- `'clear'`
+- `'startGroup'`
+- `'startGroupCollapsed'`
+- `'endGroup'`
+- `'assert'`
+- `'profile'`
+- `'profileEnd'`
+- `'count'`
+- `'timeEnd'`
+
+```typescript
+page.on('console', msg => {
+  if (msg.type() === 'error') {
+    console.error('Page error:', msg.text());
+  }
+});
+```
+
+### text()
+
+Get the text of the console message.
+
+**Returns:** `string`
+
+```typescript
+page.on('console', msg => {
+  console.log(msg.text());
+});
+```
+
+### args()
+
+Get the list of arguments passed to the console method.
+
+**Returns:** `JSHandle[]`
+
+Each argument is represented as a JSHandle that can be evaluated:
+
+```typescript
+page.on('console', async msg => {
+  const args = msg.args();
+  for (const arg of args) {
+    const value = await arg.jsonValue();
+    console.log(value);
+  }
+});
+```
+
+### location()
+
+Get the location in the source code where the console method was called.
+
+**Returns:** `{ url: string, lineNumber: number, columnNumber: number }`
+
+<ParamField path="url" type="string">
+  URL of the script where console was called
+</ParamField>
+
+<ParamField path="lineNumber" type="number">
+  Line number in the script (0-based)
+</ParamField>
+
+<ParamField path="columnNumber" type="number">
+  Column number in the script (0-based)
+</ParamField>
+
+```typescript
+page.on('console', msg => {
+  const location = msg.location();
+  console.log(`Console at ${location.url}:${location.lineNumber}`);
+});
+```
+
+### timestamp()
+
+Get the timestamp when the message was logged.
+
+**Returns:** `number`
+
+Timestamp in milliseconds since Unix epoch:
+
+```typescript
+page.on('console', msg => {
+  const time = new Date(msg.timestamp());
+  console.log(`Message at ${time.toISOString()}: ${msg.text()}`);
+});
+```
+
+### page()
+
+Get the page that emitted the console message.
+
+**Returns:** `Page | null`
+
+Returns `null` if the message came from a worker:
+
+```typescript
+page.on('console', msg => {
+  const sourcePage = msg.page();
+  if (sourcePage) {
+    console.log(`Message from page: ${sourcePage.url()}`);
+  }
+});
+```
+
+### worker()
+
+Get the worker that emitted the console message.
+
+**Returns:** `Worker | null`
+
+Returns `null` if the message came from a page:
+
+```typescript
+page.on('console', msg => {
+  const worker = msg.worker();
+  if (worker) {
+    console.log(`Message from worker: ${worker.url()}`);
+  }
+});
+```
+
+## Examples
+
+### Filter by Message Type
+
+```typescript
+test('capture errors only', async ({ page }) => {
+  const errors: string[] = [];
+  
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      errors.push(msg.text());
+    }
+  });
+  
+  await page.goto('https://example.com');
+  
+  // Assert no errors occurred
+  expect(errors).toHaveLength(0);
+});
+```
+
+### Log with Source Location
+
+```typescript
+page.on('console', msg => {
+  const location = msg.location();
+  console.log(
+    `[${msg.type()}] ${msg.text()} ` +
+    `(${location.url}:${location.lineNumber}:${location.columnNumber})`
+  );
+});
+```
+
+### Inspect Complex Objects
+
+```typescript
+page.on('console', async msg => {
+  console.log(`Type: ${msg.type()}`);
+  
+  // Get all arguments
+  const args = msg.args();
+  for (let i = 0; i < args.length; i++) {
+    const value = await args[i].jsonValue();
+    console.log(`Arg ${i}:`, value);
+  }
+});
+
+// In page
+await page.evaluate(() => {
+  console.log('User:', { name: 'Alice', age: 30 });
+});
+```
+
+### Collect Console Timeline
+
+```typescript
+test('console timeline', async ({ page }) => {
+  const timeline: Array<{ time: number, type: string, text: string }> = [];
+  
+  page.on('console', msg => {
+    timeline.push({
+      time: msg.timestamp(),
+      type: msg.type(),
+      text: msg.text(),
+    });
+  });
+  
+  await page.goto('https://example.com');
+  
+  // Print timeline
+  timeline.forEach(entry => {
+    const time = new Date(entry.time).toISOString();
+    console.log(`${time} [${entry.type}] ${entry.text}`);
+  });
+});
+```
+
+### Distinguish Page vs Worker
+
+```typescript
+page.on('console', msg => {
+  if (msg.page()) {
+    console.log('Page console:', msg.text());
+  } else if (msg.worker()) {
+    console.log('Worker console:', msg.text());
+  }
+});
+```
+
+## Best Practices
+
+### Always Check Message Type
+
+Different message types may require different handling:
+
+```typescript
+page.on('console', msg => {
+  switch (msg.type()) {
+    case 'error':
+      console.error(msg.text());
+      break;
+    case 'warning':
+      console.warn(msg.text());
+      break;
+    default:
+      console.log(msg.text());
+  }
+});
+```
+
+### Handle Async Operations
+
+If you need to evaluate JSHandles, make the listener async:
+
+```typescript
+page.on('console', async msg => {
+  const args = msg.args();
+  for (const arg of args) {
+    try {
+      const value = await arg.jsonValue();
+      console.log(value);
+    } catch (e) {
+      // Handle evaluation errors
+    }
+  }
+});
+```
+
+### Dispose JSHandles
+
+JSHandles keep objects in memory. Dispose them when done:
+
+```typescript
+page.on('console', async msg => {
+  const args = msg.args();
+  for (const arg of args) {
+    const value = await arg.jsonValue();
+    console.log(value);
+    await arg.dispose(); // Free memory
+  }
+});
+```
+
+## Related
+
+- [Page](/api/page) - Page object
+- [Worker](/api/worker) - Web Worker object
+- [JSHandle](/api/js-handle) - JavaScript object handle

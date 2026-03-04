@@ -1,0 +1,344 @@
+---
+title: Dialog
+description: API for interacting with JavaScript dialogs (alert, confirm, prompt)
+---
+
+The Dialog class represents JavaScript dialogs created by `alert()`, `confirm()`, `prompt()`, or `beforeunload` events. Playwright automatically dismisses dialogs unless you explicitly handle them.
+
+## Overview
+
+```typescript
+import { test } from '@playwright/test';
+
+test('handle alert dialog', async ({ page }) => {
+  page.on('dialog', dialog => {
+    console.log(`Dialog: ${dialog.message()}`);
+    dialog.accept();
+  });
+  
+  await page.goto('https://example.com');
+  await page.evaluate(() => alert('Hello!'));
+});
+```
+
+## Methods
+
+### type()
+
+Get the type of the dialog.
+
+**Returns:** `string`
+
+Possible values:
+- `'alert'`
+- `'beforeunload'`
+- `'confirm'`
+- `'prompt'`
+
+```typescript
+page.on('dialog', dialog => {
+  console.log(`Dialog type: ${dialog.type()}`);
+});
+```
+
+### message()
+
+Get the message displayed in the dialog.
+
+**Returns:** `string`
+
+```typescript
+page.on('dialog', dialog => {
+  console.log(`Dialog message: ${dialog.message()}`);
+});
+```
+
+### defaultValue()
+
+Get the default value for prompt dialogs.
+
+**Returns:** `string`
+
+Returns an empty string for non-prompt dialogs:
+
+```typescript
+page.on('dialog', dialog => {
+  if (dialog.type() === 'prompt') {
+    console.log(`Default value: ${dialog.defaultValue()}`);
+  }
+});
+```
+
+### accept(promptText?)
+
+Accept the dialog. For prompt dialogs, optionally provide input text.
+
+<ParamField path="promptText" type="string">
+  Text to enter in prompt dialog (only for prompt type)
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+// Accept alert/confirm
+page.on('dialog', dialog => dialog.accept());
+
+// Accept prompt with text
+page.on('dialog', dialog => {
+  if (dialog.type() === 'prompt') {
+    dialog.accept('My answer');
+  } else {
+    dialog.accept();
+  }
+});
+```
+
+### dismiss()
+
+Dismiss the dialog (click Cancel).
+
+**Returns:** `Promise<void>`
+
+```typescript
+page.on('dialog', dialog => dialog.dismiss());
+```
+
+### page()
+
+Get the page that opened the dialog.
+
+**Returns:** `Page | null`
+
+Returns `null` if the dialog was opened during page initialization:
+
+```typescript
+page.on('dialog', dialog => {
+  const sourcePage = dialog.page();
+  if (sourcePage) {
+    console.log(`Dialog from: ${sourcePage.url()}`);
+  }
+});
+```
+
+## Examples
+
+### Handle Alert Dialog
+
+```typescript
+test('accept alert', async ({ page }) => {
+  page.on('dialog', dialog => {
+    expect(dialog.type()).toBe('alert');
+    expect(dialog.message()).toBe('Hello!');
+    dialog.accept();
+  });
+  
+  await page.goto('https://example.com');
+  await page.evaluate(() => alert('Hello!'));
+});
+```
+
+### Handle Confirm Dialog
+
+```typescript
+test('confirm dialog', async ({ page }) => {
+  page.on('dialog', dialog => {
+    if (dialog.type() === 'confirm') {
+      // Click OK
+      dialog.accept();
+      // Or click Cancel
+      // dialog.dismiss();
+    }
+  });
+  
+  const result = await page.evaluate(() => confirm('Are you sure?'));
+  console.log(`User clicked: ${result ? 'OK' : 'Cancel'}`);
+});
+```
+
+### Handle Prompt Dialog
+
+```typescript
+test('prompt dialog', async ({ page }) => {
+  page.on('dialog', dialog => {
+    if (dialog.type() === 'prompt') {
+      console.log(`Default: ${dialog.defaultValue()}`);
+      dialog.accept('Alice');
+    }
+  });
+  
+  const name = await page.evaluate(() => 
+    prompt('Enter your name:', 'Guest')
+  );
+  expect(name).toBe('Alice');
+});
+```
+
+### Conditional Dialog Handling
+
+```typescript
+test('conditional dialog handling', async ({ page }) => {
+  page.on('dialog', dialog => {
+    const message = dialog.message();
+    
+    if (message.includes('delete')) {
+      dialog.accept(); // Confirm deletion
+    } else if (message.includes('cancel')) {
+      dialog.dismiss(); // Cancel operation
+    } else {
+      dialog.accept(); // Default: accept
+    }
+  });
+  
+  await page.goto('https://example.com');
+  await page.click('#delete-button');
+});
+```
+
+### Wait for Specific Dialog
+
+```typescript
+test('wait for dialog', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const dialogPromise = page.waitForEvent('dialog');
+  await page.click('#show-alert');
+  
+  const dialog = await dialogPromise;
+  expect(dialog.message()).toBe('Success!');
+  await dialog.accept();
+});
+```
+
+### Handle BeforeUnload Dialog
+
+```typescript
+test('beforeunload dialog', async ({ page }) => {
+  page.on('dialog', dialog => {
+    if (dialog.type() === 'beforeunload') {
+      dialog.accept(); // Allow navigation
+    }
+  });
+  
+  await page.goto('https://example.com');
+  await page.evaluate(() => {
+    window.addEventListener('beforeunload', e => {
+      e.preventDefault();
+      e.returnValue = '';
+    });
+  });
+  
+  await page.goto('https://another-site.com');
+});
+```
+
+### Collect All Dialogs
+
+```typescript
+test('collect dialogs', async ({ page }) => {
+  const dialogs: Array<{ type: string, message: string }> = [];
+  
+  page.on('dialog', dialog => {
+    dialogs.push({
+      type: dialog.type(),
+      message: dialog.message(),
+    });
+    dialog.accept();
+  });
+  
+  await page.goto('https://example.com');
+  await page.evaluate(() => {
+    alert('First');
+    alert('Second');
+  });
+  
+  expect(dialogs).toHaveLength(2);
+  expect(dialogs[0].message).toBe('First');
+  expect(dialogs[1].message).toBe('Second');
+});
+```
+
+## Best Practices
+
+### Always Handle Dialogs
+
+Unhandled dialogs will cause tests to hang:
+
+```typescript
+// Good: Handle the dialog
+page.on('dialog', dialog => dialog.accept());
+
+// Bad: Dialog not handled will block execution
+```
+
+### Use Once for Single Dialogs
+
+If you expect only one dialog:
+
+```typescript
+page.once('dialog', dialog => dialog.accept());
+```
+
+### Handle Dialogs Before Triggering
+
+Set up the handler before the action that triggers the dialog:
+
+```typescript
+// Good: Handler set up first
+page.once('dialog', dialog => dialog.accept());
+await page.click('#show-alert');
+
+// Bad: Race condition possible
+await page.click('#show-alert');
+page.once('dialog', dialog => dialog.accept()); // Might miss it
+```
+
+### Clean Up Event Listeners
+
+Remove listeners when they're no longer needed:
+
+```typescript
+const handler = dialog => dialog.accept();
+page.on('dialog', handler);
+
+// Later...
+page.off('dialog', handler);
+```
+
+## Common Pitfalls
+
+### Missing Dialog Handler
+
+If a dialog appears without a handler, the test will timeout:
+
+```typescript
+// This will hang if alert appears
+await page.evaluate(() => alert('Hello'));
+
+// Solution: Add handler first
+page.once('dialog', dialog => dialog.accept());
+await page.evaluate(() => alert('Hello'));
+```
+
+### Async Handler Issues
+
+Dialog handlers should not perform long async operations:
+
+```typescript
+// Bad: Might cause issues
+page.on('dialog', async dialog => {
+  await someAsyncOperation(); // Don't do this
+  dialog.accept();
+});
+
+// Good: Keep it simple
+page.on('dialog', dialog => {
+  dialog.accept();
+  // Do async work after
+  someAsyncOperation();
+});
+```
+
+## Related
+
+- [Page](/api/page) - Page object
+- [Page Events](/api/page#events) - All page events

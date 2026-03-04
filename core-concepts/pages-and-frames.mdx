@@ -1,0 +1,609 @@
+---
+title: Pages and Frames
+description: Understanding pages, frames, navigation, and the DOM hierarchy in Playwright
+---
+
+## Pages
+
+A **Page** (client/page.ts:80) represents a single tab or popup window within a browser context.
+
+```typescript
+export class Page extends ChannelOwner<channels.PageChannel> {
+  private _browserContext: BrowserContext;
+  private _mainFrame: Frame;
+  private _frames = new Set<Frame>();
+  private _closed = false;
+  private _viewportSize: Size | undefined;
+  
+  readonly keyboard: Keyboard;
+  readonly mouse: Mouse;
+  readonly touchscreen: Touchscreen;
+  readonly request: APIRequestContext;
+}
+```
+
+## Creating Pages
+
+### From Context
+
+```javascript
+const context = await browser.newContext();
+const page = await context.newPage();
+```
+
+### Shortcut (Creates Context + Page)
+
+```javascript
+const page = await browser.newPage();
+// Equivalent to:
+// const context = await browser.newContext();
+// const page = await context.newPage();
+```
+
+From client/browser.ts:137:
+
+```typescript
+async newPage(options: BrowserContextOptions = {}): Promise<Page> {
+  return await this._wrapApiCall(async () => {
+    const context = await this.newContext(options);
+    const page = await context.newPage();
+    page._ownedContext = context;  // Context owned by this page
+    context._ownerPage = page;
+    return page;
+  }, { title: 'Create page' });
+}
+```
+
+## Page Lifecycle
+
+<Steps>
+  <Step title="Page Creation">
+    ```javascript
+    const page = await context.newPage();
+    ```
+  </Step>
+  
+  <Step title="Navigation">
+    ```javascript
+    await page.goto('https://example.com');
+    await page.waitForLoadState('networkidle');
+    ```
+  </Step>
+  
+  <Step title="Interaction">
+    ```javascript
+    await page.click('#button');
+    await page.fill('input[name="email"]', 'user@example.com');
+    ```
+  </Step>
+  
+  <Step title="Cleanup">
+    ```javascript
+    await page.close();
+    ```
+  </Step>
+</Steps>
+
+## Navigation
+
+### Basic Navigation
+
+```javascript
+// Navigate to URL
+await page.goto('https://example.com');
+
+// Wait for load state
+await page.goto('https://example.com', {
+  waitUntil: 'networkidle'
+});
+
+// Navigate with timeout
+await page.goto('https://example.com', {
+  timeout: 60000  // 60 seconds
+});
+```
+
+### Navigation Options
+
+From client/frame.ts:111-115:
+
+```typescript
+async goto(url: string, options: FrameGotoOptions = {}): Promise<Response | null> {
+  const waitUntil = verifyLoadState('waitUntil', options.waitUntil === undefined ? 'load' : options.waitUntil);
+  this.page().context()._checkUrlAllowed(url);
+  return Response.fromNullable((await this._channel.goto({ url, ...options, waitUntil, timeout: this._navigationTimeout(options) })).response);
+}
+```
+
+Wait states:
+- **`load`** - Page load event fired (default)
+- **`domcontentloaded`** - DOM is ready
+- **`networkidle`** - No network connections for 500ms
+- **`commit`** - Navigation committed
+
+### History Navigation
+
+```javascript
+// Go back
+await page.goBack();
+
+// Go forward
+await page.goForward();
+
+// Reload
+await page.reload();
+```
+
+### Wait for Navigation
+
+```javascript
+// Click and wait for navigation
+const [response] = await Promise.all([
+  page.waitForNavigation(),
+  page.click('a.link')
+]);
+
+// Wait for specific URL
+await page.waitForURL('**/dashboard');
+
+// Wait for URL pattern
+await page.waitForURL(/\/user\/\d+/);
+```
+
+## Frames
+
+Frames represent the main document or iframes within a page.
+
+```typescript
+export class Frame extends ChannelOwner<channels.FrameChannel> {
+  _parentFrame: Frame | null = null;
+  _url = '';
+  _name = '';
+  _detached = false;
+  _childFrames = new Set<Frame>();
+  _page: Page | undefined;
+}
+```
+
+### Accessing Frames
+
+```javascript
+// Main frame
+const mainFrame = page.mainFrame();
+
+// All frames
+const frames = page.frames();
+
+// Find frame by name
+const frame = page.frame({ name: 'myframe' });
+
+// Find frame by URL
+const frame = page.frame({ url: /.*example.com.*/ });
+```
+
+### Frame Hierarchy
+
+```javascript
+// Get child frames
+const childFrames = frame.childFrames();
+
+// Get parent frame
+const parentFrame = frame.parentFrame();
+
+// Check if detached
+if (frame.isDetached()) {
+  console.log('Frame no longer exists');
+}
+```
+
+From client/page.ts:174-188:
+
+```typescript
+private _onFrameAttached(frame: Frame) {
+  frame._page = this;
+  this._frames.add(frame);
+  if (frame._parentFrame)
+    frame._parentFrame._childFrames.add(frame);
+  this.emit(Events.Page.FrameAttached, frame);
+}
+
+private _onFrameDetached(frame: Frame) {
+  this._frames.delete(frame);
+  frame._detached = true;
+  if (frame._parentFrame)
+    frame._parentFrame._childFrames.delete(frame);
+  this.emit(Events.Page.FrameDetached, frame);
+}
+```
+
+### Working with Frames
+
+```javascript
+// Interact with main frame
+await page.mainFrame().click('#button');
+
+// Interact with specific frame
+const frame = page.frame({ name: 'iframe1' });
+await frame.fill('input', 'value');
+
+// Wait for frame to load
+await frame.waitForLoadState('load');
+```
+
+## FrameLocator
+
+A modern way to work with iframes:
+
+```javascript
+// Locate iframe
+const frameLocator = page.frameLocator('iframe#myframe');
+
+// Interact with elements inside iframe
+await frameLocator.locator('button').click();
+await frameLocator.getByRole('textbox').fill('text');
+
+// Nested iframes
+const nested = page
+  .frameLocator('iframe#outer')
+  .frameLocator('iframe#inner')
+  .locator('button');
+```
+
+From client/locator.ts:405:
+
+```typescript
+export class FrameLocator implements api.FrameLocator {
+  private _frame: Frame;
+  private _frameSelector: string;
+  
+  locator(selector: string, options?: LocatorOptions): Locator {
+    return new Locator(
+      this._frame,
+      this._frameSelector + ' >> internal:control=enter-frame >> ' + selector,
+      options
+    );
+  }
+}
+```
+
+<Note>
+FrameLocator is recommended over `page.frame()` as it automatically waits and handles frame lifecycle.
+</Note>
+
+## Page Properties
+
+### URL
+
+```javascript
+const url = page.url();
+console.log('Current URL:', url);
+```
+
+### Title
+
+```javascript
+const title = await page.title();
+console.log('Page title:', title);
+```
+
+### Content
+
+```javascript
+// Get HTML content
+const html = await page.content();
+
+// Set HTML content
+await page.setContent('<html><body>Hello</body></html>');
+```
+
+### Viewport
+
+```javascript
+// Get viewport size
+const viewport = page.viewportSize();
+console.log(viewport); // { width: 1280, height: 720 }
+
+// Set viewport size
+await page.setViewportSize({ width: 1920, height: 1080 });
+```
+
+## Page Events
+
+```javascript
+// Page loaded
+page.on('load', () => {
+  console.log('Page loaded');
+});
+
+// DOM content loaded
+page.on('domcontentloaded', () => {
+  console.log('DOM ready');
+});
+
+// New page/popup opened
+page.on('popup', popup => {
+  console.log('New popup:', popup.url());
+});
+
+// Console message
+page.on('console', msg => {
+  console.log('Console:', msg.type(), msg.text());
+});
+
+// Dialog (alert, confirm, prompt)
+page.on('dialog', dialog => {
+  console.log('Dialog:', dialog.message());
+  dialog.accept();
+});
+
+// Request made
+page.on('request', request => {
+  console.log('Request:', request.url());
+});
+
+// Response received
+page.on('response', response => {
+  console.log('Response:', response.url(), response.status());
+});
+
+// Page closed
+page.on('close', () => {
+  console.log('Page closed');
+});
+
+// Page crashed
+page.on('crash', () => {
+  console.log('Page crashed');
+});
+```
+
+## Popup Handling
+
+```javascript
+// Wait for popup
+const [popup] = await Promise.all([
+  page.waitForEvent('popup'),
+  page.click('a[target="_blank"]')
+]);
+
+await popup.waitForLoadState();
+console.log('Popup URL:', popup.url());
+await popup.close();
+```
+
+## Dialog Handling
+
+```javascript
+// Handle alert/confirm/prompt
+page.on('dialog', async dialog => {
+  console.log('Dialog type:', dialog.type());
+  console.log('Dialog message:', dialog.message());
+  
+  if (dialog.type() === 'confirm') {
+    await dialog.accept();
+  } else if (dialog.type() === 'prompt') {
+    await dialog.accept('my input');
+  } else {
+    await dialog.dismiss();
+  }
+});
+
+// Trigger dialog
+await page.evaluate(() => alert('Hello'));
+```
+
+## Workers
+
+Access Web Workers and Service Workers:
+
+```javascript
+// Web Workers
+page.on('worker', worker => {
+  console.log('Worker created:', worker.url());
+  worker.on('console', msg => {
+    console.log('Worker console:', msg.text());
+  });
+});
+
+const workers = page.workers();
+
+// Service Workers (from context)
+context.on('serviceworker', worker => {
+  console.log('Service Worker:', worker.url());
+});
+```
+
+## Multiple Pages
+
+```javascript
+const context = await browser.newContext();
+
+// Create multiple pages
+const page1 = await context.newPage();
+const page2 = await context.newPage();
+const page3 = await context.newPage();
+
+// They share cookies and storage
+await page1.goto('https://example.com/login');
+await page1.fill('#username', 'user');
+await page1.click('#login');
+
+// page2 is also logged in (same context)
+await page2.goto('https://example.com/dashboard');
+
+// Get all pages in context
+const pages = context.pages();
+console.log(`Total pages: ${pages.length}`);
+```
+
+## Page Isolation
+
+Pages within the same context share state:
+
+```javascript
+const context = await browser.newContext();
+const page1 = await context.newPage();
+const page2 = await context.newPage();
+
+// Set cookie on page1
+await page1.goto('https://example.com');
+await context.addCookies([{
+  name: 'session',
+  value: 'abc123',
+  domain: 'example.com',
+  path: '/'
+}]);
+
+// page2 has the same cookie
+await page2.goto('https://example.com');
+const cookies = await context.cookies();
+// Both pages see the session cookie
+```
+
+## Viewport and Emulation
+
+```javascript
+// Mobile emulation
+const iPhone = devices['iPhone 13'];
+const context = await browser.newContext({
+  ...iPhone
+});
+const page = await context.newPage();
+
+// Custom viewport
+await page.setViewportSize({
+  width: 1920,
+  height: 1080
+});
+
+// Media emulation
+await page.emulateMedia({
+  colorScheme: 'dark',
+  reducedMotion: 'reduce'
+});
+```
+
+## Screenshots
+
+```javascript
+// Full page screenshot
+await page.screenshot({ path: 'screenshot.png' });
+
+// Viewport screenshot
+await page.screenshot({
+  path: 'viewport.png',
+  fullPage: false
+});
+
+// Specific element
+await page.locator('#header').screenshot({
+  path: 'header.png'
+});
+```
+
+## PDF Generation
+
+```javascript
+// Generate PDF (Chromium only)
+await page.pdf({
+  path: 'page.pdf',
+  format: 'A4',
+  margin: {
+    top: '1cm',
+    right: '1cm',
+    bottom: '1cm',
+    left: '1cm'
+  }
+});
+```
+
+## Accessibility
+
+```javascript
+// Get accessibility tree
+const snapshot = await page.accessibility.snapshot();
+console.log(JSON.stringify(snapshot, null, 2));
+```
+
+## Performance
+
+```javascript
+// Get performance metrics (Chromium only)
+const metrics = await page.metrics();
+console.log(metrics);
+// { Timestamp, Documents, Frames, JSEventListeners, ... }
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Wait for Load States">
+    Always wait for appropriate load state after navigation.
+    
+    ```javascript
+    await page.goto('https://example.com', {
+      waitUntil: 'networkidle'  // Wait for network to be idle
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Frame Lifecycle">
+    Use FrameLocator for iframe interactions.
+    
+    ```javascript
+    // Better than page.frame()
+    const frameLocator = page.frameLocator('iframe');
+    await frameLocator.locator('button').click();
+    ```
+  </Accordion>
+  
+  <Accordion title="Listen for Events Early">
+    Set up event listeners before triggering actions.
+    
+    ```javascript
+    // Setup listener first
+    const popupPromise = page.waitForEvent('popup');
+    
+    // Then trigger
+    await page.click('a[target="_blank"]');
+    
+    // Then wait
+    const popup = await popupPromise;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Frame vs FrameLocator
+
+| Feature | Frame | FrameLocator |
+|---------|-------|-------------|
+| **Auto-waiting** | No | Yes |
+| **Retries** | No | Yes |
+| **Lifecycle handling** | Manual | Automatic |
+| **Recommended** | Legacy | Modern |
+
+```javascript
+// Old way
+const frame = page.frame({ name: 'myframe' });
+if (frame) {
+  await frame.click('button');
+}
+
+// New way (recommended)
+const frame = page.frameLocator('iframe[name="myframe"]');
+await frame.locator('button').click();
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Selectors" icon="crosshairs" href="./selectors">
+    Learn how to find elements
+  </Card>
+  <Card title="Auto-waiting" icon="clock" href="./auto-waiting">
+    Understanding automatic waiting
+  </Card>
+  <Card title="Locators" icon="location-dot" href="../api-reference/locators">
+    Working with locators
+  </Card>
+</CardGroup>

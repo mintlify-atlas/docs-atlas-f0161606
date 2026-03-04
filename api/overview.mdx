@@ -1,0 +1,151 @@
+---
+title: 'API Reference Overview'
+description: 'Complete reference for Playwright Test API including test functions, fixtures, and configuration'
+---
+
+# API Reference Overview
+
+Playwright Test provides a comprehensive API for writing and running end-to-end tests. This reference covers the core APIs, fixtures, and configuration options available.
+
+## Core Test API
+
+The test API is the foundation of Playwright Test. It provides functions for defining tests, organizing them into suites, and managing test execution.
+
+### Main Functions
+
+- **[test()](/api/test)** - Define a test case
+- **[test.describe()](/api/test#testdescribe)** - Group tests into a suite
+- **[test.beforeEach()](/api/test#testbeforeeach)** - Run setup before each test
+- **[test.afterEach()](/api/test#testaftereach)** - Run cleanup after each test
+- **[test.beforeAll()](/api/test#testbeforeall)** - Run setup once before all tests
+- **[test.afterAll()](/api/test#testafterall)** - Run cleanup once after all tests
+
+### Test Modifiers
+
+- **[test.skip()](/api/test#testskip)** - Skip a test
+- **[test.only()](/api/test#testonly)** - Run only this test
+- **[test.fixme()](/api/test#testfixme)** - Mark a test as broken
+- **[test.fail()](/api/test#testfail)** - Expect a test to fail
+- **[test.slow()](/api/test#testslow)** - Mark a test as slow
+
+### Advanced Features
+
+- **[test.step()](/api/test#teststep)** - Create a custom test step
+- **[test.use()](/api/test#testuse)** - Override fixtures for a file
+- **[test.extend()](/api/test#testextend)** - Add custom fixtures
+- **[test.info()](/api/test#testinfo)** - Get current test information
+
+## Fixtures
+
+Playwright Test uses fixtures to establish the test environment. Fixtures are automatically set up and torn down for each test.
+
+### Built-in Fixtures
+
+- **[Test Fixtures](/api/test-fixtures)** - Fixtures available to each test (page, context, request, agent)
+- **[Worker Fixtures](/api/test-fixtures)** - Fixtures shared across tests (browser, playwright)
+
+### Fixture Types
+
+```typescript
+interface PlaywrightTestArgs {
+  page: Page;
+  context: BrowserContext;
+  request: APIRequestContext;
+  agent: PageAgent;
+}
+
+interface PlaywrightWorkerArgs {
+  browser: Browser;
+  playwright: typeof import('playwright-core');
+}
+```
+
+## Configuration
+
+Playwright Test is configured through a configuration file that defines how tests are run, which browsers to use, and various other options.
+
+### Configuration Options
+
+- **[Test Config](/api/test-config)** - Main configuration interface
+- **[Project Config](/api/test-config#project-configuration)** - Per-project configuration
+- **[Use Options](/api/test-config#use-options)** - Browser and context options
+
+### Key Configuration Areas
+
+- **Test execution** - workers, timeout, retries, fullyParallel
+- **Browser options** - browserName, headless, channel, launchOptions
+- **Context options** - viewport, baseURL, storageState, permissions
+- **Recording options** - screenshot, video, trace
+- **Reporting** - reporter, reportSlowTests
+
+## Common Patterns
+
+### Basic Test
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('basic test', async ({ page }) => {
+  await page.goto('https://example.com');
+  await expect(page).toHaveTitle(/Example/);
+});
+```
+
+### Test with Custom Fixtures
+
+```typescript
+import { test as base } from '@playwright/test';
+
+const test = base.extend<{ userName: string }>({
+  userName: async ({}, use) => {
+    await use('testuser');
+  },
+});
+
+test('test with custom fixture', async ({ page, userName }) => {
+  await page.goto(`/user/${userName}`);
+});
+```
+
+### Grouped Tests
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('feature tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/feature');
+  });
+
+  test('feature works', async ({ page }) => {
+    await expect(page.getByRole('heading')).toBeVisible();
+  });
+
+  test('feature handles input', async ({ page }) => {
+    await page.getByRole('textbox').fill('test');
+  });
+});
+```
+
+## Type Definitions
+
+Playwright Test is written in TypeScript and provides complete type definitions. Import types from `@playwright/test`:
+
+```typescript
+import type {
+  TestType,
+  TestInfo,
+  PlaywrightTestArgs,
+  PlaywrightTestOptions,
+  PlaywrightWorkerArgs,
+  PlaywrightWorkerOptions,
+  Fixtures,
+} from '@playwright/test';
+```
+
+## Next Steps
+
+- Explore the **[Test API](/api/test)** for detailed method documentation
+- Learn about **[Test Fixtures](/api/test-fixtures)** and available fixtures
+- Configure your tests with **[Test Config](/api/test-config)**
+- Review examples in the [Guides](/guides) section

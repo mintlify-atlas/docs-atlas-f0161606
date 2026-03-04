@@ -1,0 +1,198 @@
+---
+title: BrowserType
+description: API reference for the BrowserType class - launch and connect to browsers
+---
+
+BrowserType provides methods to launch or connect to browser instances. Available through `playwright.chromium`, `playwright.firefox`, or `playwright.webkit`.
+
+## Inheritance
+
+Extends: `ChannelOwner`
+
+## Methods
+
+### executablePath
+
+Returns the path to the browser executable.
+
+```typescript
+executablePath(): string
+```
+
+**Returns:** `string` - Path to the browser executable
+
+**Throws:** Error if the browser is not supported on the current platform
+
+### name
+
+Returns the browser name.
+
+```typescript
+name(): string
+```
+
+**Returns:** `string` - Browser name ('chromium', 'firefox', or 'webkit')
+
+### launch
+
+Launches a new browser instance.
+
+```typescript
+launch(options?: LaunchOptions): Promise<Browser>
+```
+
+<ParamField path="options" type="LaunchOptions" optional>
+  Launch configuration options
+  
+  - `headless` (boolean): Whether to run in headless mode (default: true)
+  - `executablePath` (string): Path to browser executable
+  - `args` (string[]): Additional arguments to pass to the browser
+  - `ignoreDefaultArgs` (boolean | string[]): Ignore default arguments
+  - `channel` (string): Browser channel to use
+  - `env` (object): Environment variables
+  - `slowMo` (number): Slows down operations by specified milliseconds
+  - `timeout` (number): Maximum time in milliseconds to wait for browser to start
+  - `logger` (Logger): Logger instance
+</ParamField>
+
+**Returns:** `Promise<Browser>` - Browser instance
+
+### launchPersistentContext
+
+Launches browser with persistent storage.
+
+```typescript
+launchPersistentContext(userDataDir: string, options?: LaunchPersistentContextOptions): Promise<BrowserContext>
+```
+
+<ParamField path="userDataDir" type="string" required>
+  Path to user data directory for persistent storage
+</ParamField>
+
+<ParamField path="options" type="LaunchPersistentContextOptions" optional>
+  Launch options combined with context options
+</ParamField>
+
+**Returns:** `Promise<BrowserContext>` - Browser context with persistent storage
+
+### connect
+
+Connects to a running browser instance.
+
+```typescript
+connect(options: ConnectOptions): Promise<Browser>
+```
+
+<ParamField path="options" type="ConnectOptions" required>
+  Connection options
+  
+  - `wsEndpoint` (string): WebSocket endpoint to connect to
+  - `timeout` (number): Maximum time to wait for connection
+  - `slowMo` (number): Slows down operations by specified milliseconds
+  - `headers` (object): Additional HTTP headers
+  - `logger` (Logger): Logger instance
+</ParamField>
+
+**Returns:** `Promise<Browser>` - Connected browser instance
+
+### connectOverCDP
+
+Connects to a browser over Chrome DevTools Protocol.
+
+```typescript
+connectOverCDP(endpointURL: string, options?: ConnectOverCDPOptions): Promise<Browser>
+```
+
+<ParamField path="endpointURL" type="string" required>
+  CDP endpoint URL (ws:// or http://)
+</ParamField>
+
+<ParamField path="options" type="ConnectOverCDPOptions" optional>
+  CDP connection options
+  
+  - `timeout` (number): Connection timeout
+  - `slowMo` (number): Slow down operations
+  - `headers` (object): Additional headers
+  - `logger` (Logger): Logger instance
+</ParamField>
+
+**Returns:** `Promise<Browser>` - Connected browser
+
+**Note:** Only supported for Chromium browsers
+
+### launchServer
+
+Launches a browser server.
+
+```typescript
+launchServer(options?: LaunchServerOptions): Promise<BrowserServer>
+```
+
+<ParamField path="options" type="LaunchServerOptions" optional>
+  Server launch options
+</ParamField>
+
+**Returns:** `Promise<BrowserServer>` - Browser server instance
+
+## Usage Examples
+
+### Launch Browser
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch({
+  headless: false,
+  slowMo: 100,
+});
+
+const page = await browser.newPage();
+await page.goto('https://example.com');
+await browser.close();
+```
+
+### Connect to Remote Browser
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.connect({
+  wsEndpoint: 'ws://localhost:3000',
+});
+
+const page = await browser.newPage();
+await page.goto('https://example.com');
+```
+
+### Launch with Persistent Context
+
+```typescript
+import { chromium } from 'playwright';
+
+const context = await chromium.launchPersistentContext('./user-data', {
+  headless: false,
+  viewport: { width: 1280, height: 720 },
+});
+
+const page = await context.newPage();
+await page.goto('https://example.com');
+```
+
+### Connect Over CDP
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.connectOverCDP('http://localhost:9222', {
+  timeout: 30000,
+});
+
+const contexts = browser.contexts();
+const page = contexts[0].pages()[0];
+```
+
+## Related Classes
+
+- [Browser](/api/browser) - Browser instance
+- [BrowserContext](/api/browser-context) - Browser context
+- [Playwright](/api/playwright) - Main entry point

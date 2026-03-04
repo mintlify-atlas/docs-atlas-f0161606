@@ -1,0 +1,381 @@
+---
+title: 'Trace Viewer'
+description: 'Analyze Playwright test execution with detailed traces showing actions, timings, screenshots, and network activity'
+---
+
+## Overview
+
+The Trace Viewer is a post-mortem debugging tool that allows you to explore a recorded trace of your test execution. It captures everything: actions, screenshots, network requests, console logs, and more. Unlike the Inspector which debugs live execution, Trace Viewer analyzes what already happened.
+
+## Recording Traces
+
+### During Test Execution
+
+Enable tracing in your Playwright config:
+
+```typescript playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    trace: 'on-first-retry',
+  },
+});
+```
+
+#### Trace Modes
+
+<ParamField path="trace" type="string">
+  <Expandable title="options">
+    - `'on-first-retry'` - Record trace only when retrying a test (default, recommended)
+    - `'on'` - Record trace for every test (large files)
+    - `'retain-on-failure'` - Record trace but delete if test passes
+    - `'on-all-retries'` - Record trace for all retry attempts
+    - `'off'` - Disable tracing
+  </Expandable>
+</ParamField>
+
+### Via Command Line
+
+Override config settings:
+
+```bash
+npx playwright test --trace on
+npx playwright test --trace retain-on-failure
+```
+
+### In Test Code
+
+Programmatically control tracing:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('custom trace', async ({ page, context }) => {
+  // Start tracing
+  await context.tracing.start({
+    screenshots: true,
+    snapshots: true,
+    sources: true,
+  });
+
+  // Your test actions
+  await page.goto('https://example.com');
+  await page.click('button');
+
+  // Stop and save trace
+  await context.tracing.stop({
+    path: 'trace.zip',
+  });
+});
+```
+
+## Opening Traces
+
+### Show Trace Command
+
+The primary way to view traces:
+
+```bash
+npx playwright show-trace
+```
+
+This opens the Trace Viewer UI where you can:
+- Drag and drop trace files
+- Paste trace URLs
+- Browse to trace files
+
+### With Trace File
+
+```bash
+npx playwright show-trace trace.zip
+```
+
+### With Trace URL
+
+```bash
+npx playwright show-trace https://example.com/trace.zip
+```
+
+### Serve Trace on Network
+
+Open trace in a browser tab:
+
+```bash
+npx playwright show-trace --host=127.0.0.1 --port=9323
+npx playwright show-trace trace.zip --host=0.0.0.0
+```
+
+This starts an HTTP server and opens the trace in your default browser.
+
+### Browser Selection
+
+```bash
+npx playwright show-trace --browser=firefox
+npx playwright show-trace -b webkit trace.zip
+```
+
+Choose which browser to display the trace viewer in:
+- `chromium` (default)
+- `firefox` or `ff`
+- `webkit` or `wk`
+
+## Trace Viewer Interface
+
+The Trace Viewer provides a comprehensive timeline view:
+
+### Action Timeline
+
+Left sidebar showing all actions:
+- Navigation events
+- Clicks and inputs
+- Assertions
+- API calls
+- Waits and timeouts
+
+Each action displays:
+- Duration
+- Success/failure status
+- Associated logs
+
+### Action Details
+
+Click any action to see:
+
+<Tabs>
+  <Tab title="Action">
+    - Method called (e.g., `page.click()`)
+    - Selector used
+    - Parameters passed
+    - Stack trace
+    - Source code location
+  </Tab>
+  
+  <Tab title="Before/After">
+    - Screenshot before action
+    - Screenshot after action
+    - DOM snapshot
+    - Hover to see element highlight
+  </Tab>
+  
+  <Tab title="Console">
+    - Console logs
+    - Errors and warnings
+    - Debug messages
+    - Custom log statements
+  </Tab>
+  
+  <Tab title="Network">
+    - All network requests
+    - Request/response headers
+    - Response body
+    - Timing information
+    - Failed requests highlighted
+  </Tab>
+  
+  <Tab title="Source">
+    - Test source code
+    - Execution path
+    - Click to jump to file
+  </Tab>
+</Tabs>
+
+### Metadata Panel
+
+Top section shows:
+- Test name and file
+- Browser and platform
+- Duration and status
+- Retry attempt number
+
+## Advanced Trace Features
+
+### Filtering Actions
+
+Use the filter box to find specific actions:
+
+```
+click
+goto
+waitFor
+expect
+```
+
+### Snapshots and Screenshots
+
+The Trace Viewer captures:
+- **Before snapshot**: DOM state before each action
+- **After snapshot**: DOM state after each action
+- **Screenshots**: Visual representation at each step
+
+<Note>
+Snapshots are interactive - you can click elements to copy selectors and explore the DOM.
+</Note>
+
+### Network Tab Analysis
+
+Investigate network issues:
+
+```typescript
+test('analyze network', async ({ page, context }) => {
+  await context.tracing.start({ snapshots: true });
+  
+  await page.goto('https://example.com');
+  await page.click('button');
+  
+  await context.tracing.stop({ path: 'network-trace.zip' });
+});
+```
+
+In the trace viewer:
+1. Open the Network tab
+2. See all requests with timing
+3. Check for failed requests (red)
+4. Inspect request/response data
+
+### Console Logs
+
+All browser console output is captured:
+
+```typescript
+test('with console', async ({ page, context }) => {
+  await context.tracing.start();
+  
+  await page.goto('https://example.com');
+  
+  // This will appear in the trace
+  await page.evaluate(() => {
+    console.log('Custom log message');
+    console.error('An error occurred');
+  });
+  
+  await context.tracing.stop({ path: 'console-trace.zip' });
+});
+```
+
+## Trace Implementation Details
+
+Based on `/home/daytona/workspace/source/packages/playwright-core/src/server/trace/viewer/traceViewer.ts:154`, the trace viewer:
+
+1. **Starts an HTTP server** to serve trace files
+2. **Validates trace paths** - supports local files, directories, and URLs
+3. **Synthesizes trace descriptors** for directory-based traces
+4. **Launches a browser** (or uses an existing one) to display the UI
+5. **Routes trace file requests** through the server
+6. **Handles live trace updates** when `--stdin` flag is used
+
+### Trace File Formats
+
+Traces can be:
+- **ZIP files** (`.zip`) - Standard format containing all trace data
+- **JSON files** (`.json`) - Trace manifest/descriptor
+- **Directories** - Unzipped trace with multiple files
+
+## Using Traces in CI/CD
+
+### Playwright Cloud
+
+```bash
+# Automatically upload traces
+npx playwright test --reporter=html
+```
+
+### Storing Artifacts
+
+```typescript playwright.config.ts
+export default defineConfig({
+  use: {
+    trace: 'retain-on-failure',
+  },
+  
+  reporter: [
+    ['html', { open: 'never' }],
+    ['json', { outputFile: 'test-results.json' }],
+  ],
+});
+```
+
+### GitHub Actions Example
+
+```yaml .github/workflows/tests.yml
+- name: Run Playwright tests
+  run: npx playwright test --trace on
+  
+- name: Upload traces
+  if: failure()
+  uses: actions/upload-artifact@v4
+  with:
+    name: playwright-traces
+    path: test-results/
+    retention-days: 30
+```
+
+Download the artifacts and view locally:
+
+```bash
+npx playwright show-trace trace.zip
+```
+
+## Performance Considerations
+
+<Warning>
+Tracing adds overhead to test execution:
+- Disk space: 1-10 MB per test (with screenshots)
+- Execution time: 10-20% slower
+- Use `on-first-retry` to minimize impact
+</Warning>
+
+### Optimizing Trace Size
+
+```typescript
+await context.tracing.start({
+  screenshots: false,  // Disable screenshots
+  snapshots: false,    // Disable DOM snapshots
+  sources: true,       // Keep source code
+});
+```
+
+## Trace Viewer Options
+
+| Option | Description |
+|--------|-------------|
+| `--browser, -b` | Browser to use (chromium, firefox, webkit) |
+| `--host, -h` | Host to serve trace on (opens in browser tab) |
+| `--port, -p` | Port to serve trace on |
+| `--stdin` | Accept trace URLs over stdin to update viewer |
+
+## Example Workflows
+
+### Debug Failed CI Test
+
+```bash
+# 1. Download trace from CI artifacts
+gh run download 12345 -n playwright-traces
+
+# 2. View the trace
+npx playwright show-trace test-results/example-test/trace.zip
+```
+
+### Compare Before/After
+
+```bash
+# Open multiple traces side-by-side
+npx playwright show-trace baseline-trace.zip
+npx playwright show-trace current-trace.zip
+```
+
+### Share Traces
+
+```bash
+# Start a server to share traces
+npx playwright show-trace --host=0.0.0.0 --port=9323 trace.zip
+
+# Others can access at:
+# http://your-ip:9323
+```
+
+## See Also
+
+- [Inspector](/tools/inspector) - Debug tests interactively
+- [UI Mode](/tools/ui-mode) - Watch tests run with live tracing
+- [Code Generator](/tools/codegen) - Generate test code from actions

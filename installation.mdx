@@ -1,0 +1,211 @@
+---
+title: Installation
+description: Install Playwright and set up your testing environment for end-to-end browser automation
+---
+
+Playwright is a framework for Web Testing and Automation that allows testing Chromium, Firefox, and WebKit with a single API. It's built to enable cross-browser web automation that is ever-green, capable, reliable, and fast.
+
+## System requirements
+
+<Info>
+Playwright requires Node.js version 18 or higher.
+</Info>
+
+Playwright supports the following platforms:
+
+- **Linux**: Chromium, Firefox, and WebKit
+- **macOS**: Chromium, Firefox, and WebKit
+- **Windows**: Chromium, Firefox, and WebKit
+
+Headless execution is supported for all browsers on all platforms.
+
+## Installation methods
+
+There are two ways to install Playwright: using the init command (recommended) or manual installation.
+
+<Tabs>
+  <Tab title="Using init command">
+    The easiest way to get started with Playwright Test is to run the init command. This is the recommended approach for new projects.
+
+    <Steps>
+      <Step title="Run the init command">
+        From your project's root directory, run:
+
+        ```bash
+        npm init playwright@latest
+        ```
+
+        Or create a new project:
+
+        ```bash
+        npm init playwright@latest new-project
+        ```
+      </Step>
+
+      <Step title="Configure your setup">
+        The init command will prompt you to:
+        - Choose which browsers to install (Chromium, Firefox, WebKit)
+        - Set up TypeScript or JavaScript
+        - Add example tests
+        - Configure GitHub Actions workflow
+      </Step>
+
+      <Step title="Verify installation">
+        After installation completes, you'll have:
+        - A `playwright.config.ts` (or `.js`) configuration file
+        - A `tests/` directory with example test files
+        - Browser binaries installed in your system
+        - Optional GitHub Actions workflow in `.github/workflows/`
+      </Step>
+    </Steps>
+
+    <Note>
+    This method automatically creates a configuration file, adds example tests, and sets up GitHub Actions workflow for CI/CD.
+    </Note>
+  </Tab>
+
+  <Tab title="Manual installation">
+    If you prefer more control over the setup process, you can install Playwright manually.
+
+    <Steps>
+      <Step title="Install the test package">
+        Add Playwright Test as a dev dependency:
+
+        ```bash
+        npm i -D @playwright/test
+        ```
+      </Step>
+
+      <Step title="Install browser binaries">
+        Install the supported browsers:
+
+        ```bash
+        npx playwright install
+        ```
+
+        <Accordion title="Install specific browsers only">
+          You can optionally install only selected browsers:
+
+          ```bash
+          # Install Chromium only
+          npx playwright install chromium
+
+          # Install multiple specific browsers
+          npx playwright install chromium firefox
+          ```
+
+          Available browser options:
+          - `chromium` - Installs Chrome for Testing
+          - `firefox` - Installs Firefox
+          - `webkit` - Installs WebKit (Safari)
+        </Accordion>
+      </Step>
+
+      <Step title="Create configuration file">
+        Create a `playwright.config.ts` file in your project root:
+
+        ```typescript
+        import { defineConfig, devices } from '@playwright/test';
+
+        export default defineConfig({
+          testDir: './tests',
+          timeout: 30000,
+          expect: {
+            timeout: 5000
+          },
+          fullyParallel: true,
+          forbidOnly: !!process.env.CI,
+          retries: process.env.CI ? 2 : 0,
+          workers: process.env.CI ? 1 : undefined,
+          reporter: 'html',
+          use: {
+            trace: 'on-first-retry',
+          },
+          projects: [
+            {
+              name: 'chromium',
+              use: { ...devices['Desktop Chrome'] },
+            },
+          ],
+        });
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Browser versions
+
+Playwright uses the following browser versions:
+
+- **Chromium**: 146.0.7680.31 (Chrome for Testing)
+- **Firefox**: 146.0.1
+- **WebKit**: 26.0
+
+<Tip>
+Playwright uses Chrome for Testing by default, which is a dedicated Chrome build for testing purposes.
+</Tip>
+
+## Using existing browser channels
+
+Instead of downloading browser binaries, you can use existing browser installations on your system:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    {
+      name: 'Google Chrome',
+      use: { channel: 'chrome' },
+    },
+    {
+      name: 'Microsoft Edge',
+      use: { channel: 'msedge' },
+    },
+  ],
+});
+```
+
+## Package information
+
+The main Playwright package includes:
+
+- **playwright**: Full Playwright library with browser automation and test runner
+- **playwright-core**: Core library without browser binaries (version 1.59.0-next)
+- **@playwright/test**: Test runner for end-to-end tests
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Run your first Playwright test
+  </Card>
+  <Card title="Writing tests" icon="code" href="/writing-tests">
+    Learn how to write effective tests
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Browser installation fails">
+  If browser installation fails, try:
+  - Check your internet connection
+  - Run with `--force` flag: `npx playwright install --force`
+  - Check system dependencies on Linux: `npx playwright install-deps`
+</Accordion>
+
+<Accordion title="Node version error">
+  Playwright requires Node.js 18 or higher. Update your Node.js version:
+  ```bash
+  node --version
+  ```
+  If below 18, upgrade using nvm or download from nodejs.org
+</Accordion>
+
+<Warning>
+  On Linux systems, you may need to install system dependencies for browsers. Run:
+  ```bash
+  npx playwright install-deps
+  ```
+</Warning>

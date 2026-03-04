@@ -1,0 +1,483 @@
+---
+title: 'API Testing'
+description: 'Test REST APIs and GraphQL endpoints with Playwright request context for comprehensive API automation'
+---
+
+## Overview
+
+Playwright provides a powerful API testing framework through the `request` context, allowing you to test REST APIs, GraphQL endpoints, and web services without launching a browser.
+
+## Getting Started
+
+### Basic API Request
+
+Make HTTP requests using the request context:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('GET request', async ({ request }) => {
+  const response = await request.get('https://api.github.com/users/microsoft');
+  
+  expect(response.ok()).toBeTruthy();
+  expect(response.status()).toBe(200);
+  
+  const data = await response.json();
+  expect(data.login).toBe('microsoft');
+  expect(data.type).toBe('Organization');
+});
+```
+
+### HTTP Methods
+
+<CodeGroup>
+```typescript GET
+const response = await request.get('https://api.example.com/users');
+const users = await response.json();
+```
+
+```typescript POST
+const response = await request.post('https://api.example.com/users', {
+  data: {
+    name: 'John Doe',
+    email: 'john@example.com',
+  },
+});
+expect(response.status()).toBe(201);
+```
+
+```typescript PUT
+const response = await request.put('https://api.example.com/users/1', {
+  data: {
+    name: 'John Smith',
+  },
+});
+```
+
+```typescript DELETE
+const response = await request.delete('https://api.example.com/users/1');
+expect(response.status()).toBe(204);
+```
+
+```typescript PATCH
+const response = await request.patch('https://api.example.com/users/1', {
+  data: {
+    email: 'newemail@example.com',
+  },
+});
+```
+</CodeGroup>
+
+## Request Configuration
+
+### Set Base URL and Headers
+
+Configure common request options:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({
+  baseURL: 'https://api.github.com',
+  extraHTTPHeaders: {
+    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': `token ${process.env.API_TOKEN}`,
+  },
+});
+
+test('create repository', async ({ request }) => {
+  const response = await request.post('/user/repos', {
+    data: { name: 'test-repo' },
+  });
+  
+  expect(response.ok()).toBeTruthy();
+});
+```
+
+### Global Configuration
+
+Set API defaults in `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    baseURL: 'https://api.example.com',
+    extraHTTPHeaders: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  },
+});
+```
+
+## Authentication
+
+### Token-Based Authentication
+
+<Steps>
+  <Step title="Set authorization header">
+    ```typescript
+    test.use({
+      extraHTTPHeaders: {
+        'Authorization': `Bearer ${process.env.API_TOKEN}`,
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Make authenticated requests">
+    ```typescript
+    test('get user profile', async ({ request }) => {
+      const response = await request.get('/api/profile');
+      expect(response.ok()).toBeTruthy();
+      
+      const profile = await response.json();
+      expect(profile.email).toBeTruthy();
+    });
+    ```
+  </Step>
+</Steps>
+
+### API Key Authentication
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('weather API with key', async ({ request }) => {
+  const response = await request.get('https://api.weather.com/data', {
+    params: {
+      apikey: process.env.WEATHER_API_KEY,
+      city: 'London',
+    },
+  });
+  
+  expect(response.ok()).toBeTruthy();
+  const weather = await response.json();
+  expect(weather.city).toBe('London');
+});
+```
+
+## Request Options
+
+### Query Parameters
+
+```typescript
+const response = await request.get('/api/search', {
+  params: {
+    q: 'playwright',
+    page: 1,
+    per_page: 10,
+  },
+});
+```
+
+### Custom Headers
+
+```typescript
+const response = await request.post('/api/data', {
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Custom-Header': 'custom-value',
+  },
+  data: { key: 'value' },
+});
+```
+
+### Form Data
+
+```typescript
+const response = await request.post('/api/upload', {
+  form: {
+    username: 'john',
+    password: 'secret',
+  },
+});
+```
+
+### Multipart Form Data
+
+```typescript
+import fs from 'fs';
+
+const response = await request.post('/api/upload', {
+  multipart: {
+    file: {
+      name: 'document.pdf',
+      mimeType: 'application/pdf',
+      buffer: fs.readFileSync('document.pdf'),
+    },
+    title: 'My Document',
+  },
+});
+```
+
+## Response Handling
+
+### Parse Response Body
+
+<CodeGroup>
+```typescript JSON
+const response = await request.get('/api/users');
+const data = await response.json();
+console.log(data);
+```
+
+```typescript Text
+const response = await request.get('/api/status');
+const text = await response.text();
+expect(text).toContain('OK');
+```
+
+```typescript Buffer
+const response = await request.get('/api/download');
+const buffer = await response.body();
+fs.writeFileSync('download.zip', buffer);
+```
+</CodeGroup>
+
+### Response Validation
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('validate API response', async ({ request }) => {
+  const response = await request.get('/api/users/1');
+  
+  // Status code
+  expect(response.ok()).toBeTruthy();
+  expect(response.status()).toBe(200);
+  
+  // Headers
+  expect(response.headers()['content-type']).toContain('application/json');
+  
+  // Body
+  const user = await response.json();
+  expect(user).toMatchObject({
+    id: expect.any(Number),
+    name: expect.any(String),
+    email: expect.stringMatching(/^[^@]+@[^@]+$/),
+  });
+});
+```
+
+## Real-World Example: GitHub API
+
+Complete example testing GitHub API from the Playwright repository:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+const user = process.env.GITHUB_USER;
+const repo = 'Test-Repo-1';
+
+test.use({
+  baseURL: 'https://api.github.com',
+  extraHTTPHeaders: {
+    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': `token ${process.env.API_TOKEN}`,
+  }
+});
+
+test.beforeAll(async ({ request }) => {
+  // Create repository
+  const response = await request.post('/user/repos', {
+    data: { name: repo }
+  });
+  expect(response.ok()).toBeTruthy();
+});
+
+test.afterAll(async ({ request }) => {
+  // Delete repository
+  const response = await request.delete(`/repos/${user}/${repo}`);
+  expect(response.ok()).toBeTruthy();
+});
+
+test('should create bug report', async ({ request }) => {
+  const newIssue = await request.post(`/repos/${user}/${repo}/issues`, {
+    data: {
+      title: '[Bug] report 1',
+      body: 'Bug description',
+    }
+  });
+  expect(newIssue.ok()).toBeTruthy();
+
+  const issues = await request.get(`/repos/${user}/${repo}/issues`);
+  expect(issues.ok()).toBeTruthy();
+  expect(await issues.json()).toContainEqual(expect.objectContaining({
+    title: '[Bug] report 1',
+    body: 'Bug description'
+  }));
+});
+
+test('should create feature request', async ({ request }) => {
+  const newIssue = await request.post(`/repos/${user}/${repo}/issues`, {
+    data: {
+      title: '[Feature] request 1',
+      body: 'Feature description',
+    }
+  });
+  expect(newIssue.ok()).toBeTruthy();
+
+  const issues = await request.get(`/repos/${user}/${repo}/issues`);
+  expect(issues.ok()).toBeTruthy();
+  expect(await issues.json()).toContainEqual(expect.objectContaining({
+    title: '[Feature] request 1',
+    body: 'Feature description'
+  }));
+});
+```
+
+## Error Handling
+
+### Handle Failed Requests
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('handle 404 error', async ({ request }) => {
+  const response = await request.get('/api/users/99999');
+  
+  expect(response.ok()).toBeFalsy();
+  expect(response.status()).toBe(404);
+  
+  const error = await response.json();
+  expect(error.message).toBe('User not found');
+});
+
+test('handle validation error', async ({ request }) => {
+  const response = await request.post('/api/users', {
+    data: { name: '' }, // Invalid data
+  });
+  
+  expect(response.status()).toBe(422);
+  const error = await response.json();
+  expect(error.errors).toContainEqual(
+    expect.objectContaining({
+      field: 'name',
+      message: 'Name is required',
+    })
+  );
+});
+```
+
+## Advanced Patterns
+
+### Retry Failed Requests
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('retry on failure', async ({ request }) => {
+  const maxRetries = 3;
+  let attempts = 0;
+  let response;
+  
+  while (attempts < maxRetries) {
+    response = await request.get('/api/unstable-endpoint');
+    if (response.ok()) break;
+    attempts++;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  expect(response.ok()).toBeTruthy();
+});
+```
+
+### Chain API Calls
+
+```typescript
+test('create and update user', async ({ request }) => {
+  // Create user
+  const createResponse = await request.post('/api/users', {
+    data: { name: 'John Doe', email: 'john@example.com' },
+  });
+  const user = await createResponse.json();
+  const userId = user.id;
+  
+  // Update user
+  const updateResponse = await request.put(`/api/users/${userId}`, {
+    data: { name: 'John Smith' },
+  });
+  expect(updateResponse.ok()).toBeTruthy();
+  
+  // Verify update
+  const getResponse = await request.get(`/api/users/${userId}`);
+  const updatedUser = await getResponse.json();
+  expect(updatedUser.name).toBe('John Smith');
+});
+```
+
+### Parallel API Requests
+
+```typescript
+test('parallel requests', async ({ request }) => {
+  const [users, posts, comments] = await Promise.all([
+    request.get('/api/users').then(r => r.json()),
+    request.get('/api/posts').then(r => r.json()),
+    request.get('/api/comments').then(r => r.json()),
+  ]);
+  
+  expect(users.length).toBeGreaterThan(0);
+  expect(posts.length).toBeGreaterThan(0);
+  expect(comments.length).toBeGreaterThan(0);
+});
+```
+
+## Best Practices
+
+<Tip>
+  **Use Setup and Teardown**: Create test data in `beforeAll` and clean up in `afterAll` to ensure isolated tests.
+</Tip>
+
+- **Store credentials securely**: Use environment variables for API keys and tokens
+- **Use base URLs**: Configure `baseURL` to avoid repeating the same URL prefix
+- **Test error scenarios**: Verify your API handles errors gracefully
+- **Validate response schemas**: Ensure API responses match expected structure
+- **Clean up test data**: Delete created resources in teardown hooks
+- **Use meaningful assertions**: Check both status codes and response bodies
+
+<Note>
+  API tests run faster than browser tests and can be used for comprehensive integration testing.
+</Note>
+
+## Troubleshooting
+
+### Request timeout
+
+Increase timeout for slow endpoints:
+
+```typescript
+const response = await request.get('/api/slow-endpoint', {
+  timeout: 30000, // 30 seconds
+});
+```
+
+### CORS errors
+
+CORS doesn't apply to API testing since requests are made directly:
+
+```typescript
+// No CORS issues with direct API requests
+const response = await request.get('https://api.example.com/data');
+```
+
+### Debug requests
+
+Log request and response details:
+
+```typescript
+test('debug API call', async ({ request }) => {
+  const response = await request.get('/api/users');
+  
+  console.log('URL:', response.url());
+  console.log('Status:', response.status());
+  console.log('Headers:', response.headers());
+  console.log('Body:', await response.text());
+});
+```
+
+<Warning>
+  Always validate SSL certificates in production. Use `ignoreHTTPSErrors` only for testing against development servers.
+</Warning>

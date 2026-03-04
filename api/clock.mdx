@@ -1,0 +1,217 @@
+---
+title: Clock
+description: API reference for Playwright Clock class for controlling time in tests
+---
+
+The Clock class allows you to control time in your tests by manipulating browser timers. This is useful for testing time-dependent behavior without actually waiting.
+
+## Overview
+
+Access the clock through the browser context:
+
+```typescript
+const clock = await context.clock;
+```
+
+## Methods
+
+### install
+
+Installs fake timers and controls time.
+
+```typescript
+await clock.install();
+await clock.install({ time: new Date('2024-01-01T00:00:00') });
+await clock.install({ time: 1000 });
+await clock.install({ time: '2024-01-01' });
+```
+
+<ParamField path="options.time" type="number | string | Date">
+  Time to initialize the clock. Can be:
+  - `number`: Unix timestamp in milliseconds
+  - `string`: Date string
+  - `Date`: Date object
+  
+  If not specified, the clock starts at the current time.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### fastForward
+
+Advances the clock by the specified amount of time.
+
+```typescript
+// Advance by 1000ms
+await clock.fastForward(1000);
+
+// Advance by duration string
+await clock.fastForward('01:00:00'); // 1 hour
+```
+
+<ParamField path="ticks" type="number | string" required>
+  Amount of time to advance. Can be:
+  - `number`: Time in milliseconds
+  - `string`: Duration string (e.g., '01:00:00' for 1 hour)
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### pauseAt
+
+Pauses time at the specified moment.
+
+```typescript
+await clock.pauseAt(new Date('2024-12-31T23:59:59'));
+await clock.pauseAt(1000);
+await clock.pauseAt('2024-06-15');
+```
+
+<ParamField path="time" type="number | string | Date" required>
+  Time to pause at. Can be:
+  - `number`: Unix timestamp in milliseconds
+  - `string`: Date string
+  - `Date`: Date object
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### resume
+
+Resumes normal time flow after it was paused.
+
+```typescript
+await clock.resume();
+```
+
+**Returns:** `Promise<void>`
+
+### runFor
+
+Advances the clock by running all pending timers for the specified duration.
+
+```typescript
+// Run timers for 1000ms
+await clock.runFor(1000);
+
+// Run timers for duration string
+await clock.runFor('00:05:00'); // 5 minutes
+```
+
+<ParamField path="ticks" type="number | string" required>
+  Amount of time to run. Can be:
+  - `number`: Time in milliseconds
+  - `string`: Duration string (e.g., '00:05:00' for 5 minutes)
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### setFixedTime
+
+Sets the clock to a fixed time. All subsequent time queries return this time.
+
+```typescript
+await clock.setFixedTime(new Date('2024-01-01T12:00:00'));
+await clock.setFixedTime(1000);
+await clock.setFixedTime('2024-01-01');
+```
+
+<ParamField path="time" type="number | string | Date" required>
+  Time to fix the clock at. Can be:
+  - `number`: Unix timestamp in milliseconds
+  - `string`: Date string
+  - `Date`: Date object
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### setSystemTime
+
+Sets the current system time without affecting timers.
+
+```typescript
+await clock.setSystemTime(new Date('2024-01-01T00:00:00'));
+await clock.setSystemTime(1000);
+await clock.setSystemTime('2024-01-01');
+```
+
+<ParamField path="time" type="number | string | Date" required>
+  Time to set. Can be:
+  - `number`: Unix timestamp in milliseconds
+  - `string`: Date string
+  - `Date`: Date object
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+## Examples
+
+### Testing time-dependent UI
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('shows correct time', async ({ page, context }) => {
+  await clock.install({ time: new Date('2024-01-01T12:00:00') });
+  
+  await page.goto('https://example.com');
+  await expect(page.locator('.current-time')).toHaveText('12:00:00');
+  
+  // Advance by 1 hour
+  await clock.fastForward(60 * 60 * 1000);
+  await expect(page.locator('.current-time')).toHaveText('13:00:00');
+});
+```
+
+### Testing countdown timer
+
+```typescript
+test('countdown timer', async ({ page, context }) => {
+  await clock.install();
+  
+  await page.goto('https://example.com/countdown');
+  await page.click('#start-countdown');
+  
+  // Fast forward 30 seconds
+  await clock.fastForward(30000);
+  await expect(page.locator('.countdown')).toHaveText('00:30');
+  
+  // Fast forward to completion
+  await clock.fastForward(30000);
+  await expect(page.locator('.countdown')).toHaveText('00:00');
+  await expect(page.locator('.status')).toHaveText('Complete!');
+});
+```
+
+### Testing scheduled tasks
+
+```typescript
+test('scheduled notification', async ({ page, context }) => {
+  await clock.install();
+  
+  await page.goto('https://example.com');
+  await page.click('#schedule-notification');
+  
+  // Run timers for 5 minutes
+  await clock.runFor('00:05:00');
+  
+  await expect(page.locator('.notification')).toBeVisible();
+});
+```
+
+### Pausing and resuming time
+
+```typescript
+test('pause and resume', async ({ page, context }) => {
+  await clock.install();
+  
+  // Pause at a specific time
+  await clock.pauseAt(new Date('2024-12-31T23:59:59'));
+  
+  await page.goto('https://example.com');
+  await expect(page.locator('.date')).toContainText('Dec 31, 2024');
+  
+  // Resume normal time flow
+  await clock.resume();
+});
+```

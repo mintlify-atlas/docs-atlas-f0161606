@@ -1,0 +1,470 @@
+---
+title: "Browser Contexts (Advanced)"
+description: "Advanced browser context features including permissions, geolocation, offline mode, and context isolation"
+---
+
+## Overview
+
+Browser contexts provide isolated browser environments. This guide covers advanced context features like permissions, geolocation, timezone emulation, offline mode, and more.
+
+## Permissions
+
+Grant or deny browser permissions for specific origins to test permission-dependent features.
+
+<CodeGroup>
+```typescript Grant Permissions
+import { test, expect } from '@playwright/test';
+
+test('grant geolocation permission', async ({ context, page }) => {
+  // Grant geolocation permission
+  await context.grantPermissions(['geolocation']);
+  
+  await page.goto('https://example.com');
+  // Now the site can access geolocation
+});
+
+test('grant permissions for specific origin', async ({ context, page }) => {
+  // Grant permissions only for a specific origin
+  await context.grantPermissions(['camera', 'microphone'], {
+    origin: 'https://example.com',
+  });
+  
+  await page.goto('https://example.com');
+  // Camera and microphone are allowed for this origin
+});
+```
+
+```typescript Multiple Permissions
+import { test } from '@playwright/test';
+
+test('grant multiple permissions', async ({ context, page }) => {
+  await context.grantPermissions([
+    'geolocation',
+    'notifications',
+    'camera',
+    'microphone',
+    'clipboard-read',
+    'clipboard-write',
+  ]);
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Clear Permissions
+import { test } from '@playwright/test';
+
+test('clear permissions during test', async ({ context, page }) => {
+  // Grant permission
+  await context.grantPermissions(['geolocation']);
+  
+  await page.goto('https://example.com');
+  // Test with permission granted
+  
+  // Clear all permissions
+  await context.clearPermissions();
+  
+  await page.reload();
+  // Test without permissions
+});
+```
+</CodeGroup>
+
+### Available Permissions
+
+<AccordionGroup>
+  <Accordion title="geolocation" icon="location-dot">
+    Allow access to device location.
+  </Accordion>
+  
+  <Accordion title="midi" icon="music">
+    Allow access to MIDI devices.
+  </Accordion>
+  
+  <Accordion title="notifications" icon="bell">
+    Allow showing notifications.
+  </Accordion>
+  
+  <Accordion title="camera" icon="camera">
+    Allow access to camera.
+  </Accordion>
+  
+  <Accordion title="microphone" icon="microphone">
+    Allow access to microphone.
+  </Accordion>
+  
+  <Accordion title="clipboard-read" icon="clipboard">
+    Allow reading from clipboard.
+  </Accordion>
+  
+  <Accordion title="clipboard-write" icon="clipboard">
+    Allow writing to clipboard.
+  </Accordion>
+  
+  <Accordion title="payment-handler" icon="credit-card">
+    Allow registering payment handlers.
+  </Accordion>
+</AccordionGroup>
+
+## Geolocation
+
+Emulate device geolocation to test location-based features.
+
+<CodeGroup>
+```typescript Set Geolocation
+import { test, expect } from '@playwright/test';
+
+test('set geolocation', async ({ context, page }) => {
+  // Set geolocation to San Francisco
+  await context.setGeolocation({
+    latitude: 37.7749,
+    longitude: -122.4194,
+  });
+  
+  await context.grantPermissions(['geolocation']);
+  await page.goto('https://maps.google.com');
+  
+  // Verify location is set correctly
+});
+```
+
+```typescript Change Geolocation
+import { test } from '@playwright/test';
+
+test('change geolocation during test', async ({ context, page }) => {
+  await context.grantPermissions(['geolocation']);
+  
+  // Start in New York
+  await context.setGeolocation({
+    latitude: 40.7128,
+    longitude: -74.0060,
+  });
+  
+  await page.goto('https://example.com');
+  // Test with NYC location
+  
+  // Change to London
+  await context.setGeolocation({
+    latitude: 51.5074,
+    longitude: -0.1278,
+  });
+  
+  await page.reload();
+  // Test with London location
+});
+```
+
+```typescript Geolocation with Accuracy
+import { test } from '@playwright/test';
+
+test('set geolocation with accuracy', async ({ context, page }) => {
+  await context.setGeolocation({
+    latitude: 37.7749,
+    longitude: -122.4194,
+    accuracy: 100, // Accuracy in meters
+  });
+  
+  await context.grantPermissions(['geolocation']);
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Clear Geolocation
+import { test } from '@playwright/test';
+
+test('clear geolocation', async ({ context, page }) => {
+  await context.setGeolocation({
+    latitude: 37.7749,
+    longitude: -122.4194,
+  });
+  
+  await context.grantPermissions(['geolocation']);
+  await page.goto('https://example.com');
+  
+  // Clear geolocation
+  await context.setGeolocation(null);
+  
+  await page.reload();
+  // Geolocation is no longer available
+});
+```
+</CodeGroup>
+
+## Offline Mode
+
+Simulate offline network conditions to test application behavior without connectivity.
+
+```typescript Offline Mode
+import { test, expect } from '@playwright/test';
+
+test('test offline behavior', async ({ context, page }) => {
+  await page.goto('https://example.com');
+  
+  // Go offline
+  await context.setOffline(true);
+  
+  // Try to navigate (should fail or show offline page)
+  await page.goto('https://another-site.com').catch(() => {
+    // Navigation will fail when offline
+  });
+  
+  // Verify offline behavior
+  await expect(page.locator('.offline-message')).toBeVisible();
+  
+  // Go back online
+  await context.setOffline(false);
+  
+  await page.goto('https://another-site.com');
+  // Should work now
+});
+```
+
+## Timezone Emulation
+
+Emulate different timezones to test time-sensitive features.
+
+```typescript Timezone Configuration
+import { test, expect } from '@playwright/test';
+
+test.use({
+  timezoneId: 'America/New_York',
+});
+
+test('test with EST timezone', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const timezone = await page.evaluate(() => {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  });
+  
+  expect(timezone).toBe('America/New_York');
+});
+```
+
+## Locale and Language
+
+Emulate different locales and languages for internationalization testing.
+
+<CodeGroup>
+```typescript Set Locale
+import { test } from '@playwright/test';
+
+test.use({
+  locale: 'de-DE',
+  timezoneId: 'Europe/Berlin',
+});
+
+test('test German locale', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Page will render in German
+  const lang = await page.evaluate(() => navigator.language);
+  expect(lang).toBe('de-DE');
+});
+```
+
+```typescript Multiple Locales
+import { test } from '@playwright/test';
+
+const locales = [
+  { locale: 'en-US', timezone: 'America/New_York' },
+  { locale: 'fr-FR', timezone: 'Europe/Paris' },
+  { locale: 'ja-JP', timezone: 'Asia/Tokyo' },
+];
+
+for (const { locale, timezone } of locales) {
+  test(`test with ${locale}`, async ({ browser }) => {
+    const context = await browser.newContext({
+      locale,
+      timezoneId: timezone,
+    });
+    
+    const page = await context.newPage();
+    await page.goto('https://example.com');
+    
+    // Test localized content
+    
+    await context.close();
+  });
+}
+```
+</CodeGroup>
+
+## HTTP Authentication
+
+Provide HTTP authentication credentials for protected resources.
+
+```typescript HTTP Credentials
+import { test } from '@playwright/test';
+
+test.use({
+  httpCredentials: {
+    username: 'admin',
+    password: 'secret',
+  },
+});
+
+test('access protected resource', async ({ page }) => {
+  await page.goto('https://example.com/protected');
+  // Credentials are automatically sent
+});
+
+test('change credentials during test', async ({ context, page }) => {
+  await page.goto('https://example.com/protected');
+  
+  // Change credentials
+  await context.setHTTPCredentials({
+    username: 'user2',
+    password: 'password2',
+  });
+  
+  await page.goto('https://example.com/other-protected');
+  
+  // Clear credentials
+  await context.setHTTPCredentials(null);
+});
+```
+
+## Extra HTTP Headers
+
+Add custom HTTP headers to all requests in the context.
+
+```typescript Custom Headers
+import { test } from '@playwright/test';
+
+test('add custom headers', async ({ context, page }) => {
+  await context.setExtraHTTPHeaders({
+    'X-API-Key': 'your-api-key',
+    'X-Custom-Header': 'custom-value',
+  });
+  
+  await page.goto('https://api.example.com');
+  // All requests will include the custom headers
+});
+```
+
+## Storage State
+
+Save and restore browser context state including cookies and local storage.
+
+<CodeGroup>
+```typescript Save Storage State
+import { test } from '@playwright/test';
+
+test('save authentication state', async ({ page, context }) => {
+  await page.goto('https://example.com/login');
+  await page.fill('#username', 'user');
+  await page.fill('#password', 'pass');
+  await page.click('#submit');
+  
+  // Wait for authentication
+  await page.waitForURL('**/dashboard');
+  
+  // Save storage state
+  await context.storageState({ path: 'auth.json' });
+});
+```
+
+```typescript Load Storage State
+import { test } from '@playwright/test';
+
+test.use({
+  storageState: 'auth.json',
+});
+
+test('use saved authentication', async ({ page }) => {
+  // Context starts with saved state
+  await page.goto('https://example.com/dashboard');
+  // Already logged in
+});
+```
+
+```typescript Programmatic Storage State
+import { test } from '@playwright/test';
+
+test('set storage state programmatically', async ({ browser }) => {
+  const context = await browser.newContext({
+    storageState: {
+      cookies: [
+        {
+          name: 'session',
+          value: 'token123',
+          domain: 'example.com',
+          path: '/',
+          expires: -1,
+          httpOnly: true,
+          secure: true,
+          sameSite: 'Lax',
+        },
+      ],
+      origins: [
+        {
+          origin: 'https://example.com',
+          localStorage: [
+            { name: 'theme', value: 'dark' },
+          ],
+        },
+      ],
+    },
+  });
+  
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+  
+  await context.close();
+});
+```
+</CodeGroup>
+
+## Service Workers
+
+Access and interact with service workers in the context.
+
+```typescript Service Workers
+import { test, expect } from '@playwright/test';
+
+test('interact with service worker', async ({ context, page }) => {
+  await page.goto('https://example.com');
+  
+  // Wait for service worker
+  const serviceWorker = await context.waitForEvent('serviceworker');
+  
+  console.log('Service worker URL:', serviceWorker.url());
+  
+  // Get all service workers
+  const workers = context.serviceWorkers();
+  expect(workers.length).toBeGreaterThan(0);
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Isolation" icon="vault">
+    Use separate contexts for tests requiring different browser states. Each context is completely isolated.
+  </Card>
+  
+  <Card title="Performance" icon="rocket">
+    Reuse contexts when possible, but create new ones when state needs to be reset completely.
+  </Card>
+  
+  <Card title="Permissions" icon="shield-check">
+    Always grant necessary permissions before navigating to pages that require them.
+  </Card>
+  
+  <Card title="Cleanup" icon="broom">
+    Contexts are automatically closed, but explicitly close them when done for clarity.
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Browser Context Basics" icon="window" href="/core-concepts/browser-contexts">
+    Learn the fundamentals of browser contexts
+  </Card>
+  
+  <Card title="Authentication" icon="key" href="/essentials/authentication">
+    Advanced authentication patterns
+  </Card>
+</CardGroup>

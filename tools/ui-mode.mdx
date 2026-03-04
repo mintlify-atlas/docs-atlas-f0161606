@@ -1,0 +1,460 @@
+---
+title: 'UI Mode'
+description: 'Interactive test runner with watch mode, time travel debugging, and live trace viewing'
+---
+
+## Overview
+
+Playwright UI Mode is an interactive test runner that combines the power of watch mode, the Inspector, and the Trace Viewer into a single experience. It's designed for test development and debugging with live updates as you edit your code.
+
+## Starting UI Mode
+
+### Basic Command
+
+```bash
+npx playwright test --ui
+```
+
+This launches the UI Mode interface in a desktop application window (using Playwright's own browsers).
+
+### Open in Browser Tab
+
+Instead of a desktop window, open UI Mode in your default browser:
+
+```bash
+npx playwright test --ui-host=127.0.0.1
+npx playwright test --ui-host=0.0.0.0 --ui-port=9323
+```
+
+Specifying a host or port opens the UI in a browser tab, making it easier to share with team members or use on remote machines.
+
+### Port Configuration
+
+```bash
+npx playwright test --ui-port=9323
+npx playwright test --ui-port=0  # Use any free port
+```
+
+## UI Mode Interface
+
+The UI Mode window is divided into several panels:
+
+### Test Explorer
+
+Left sidebar showing:
+- All test files in your project
+- Test hierarchy (describe blocks, test cases)
+- Test status indicators:
+  - ✅ Passed
+  - ❌ Failed
+  - ⏭️ Skipped
+  - 🔄 Running
+
+Click any test to:
+- Run it individually
+- View its trace
+- See test code
+
+### Filter Bar
+
+Top section with controls:
+
+<CardGroup cols={2}>
+  <Card title="Project Filter" icon="filter">
+    Select which projects to run (Chromium, Firefox, WebKit)
+  </Card>
+  
+  <Card title="Status Filter" icon="list-check">
+    Show only passed, failed, or skipped tests
+  </Card>
+  
+  <Card title="Text Search" icon="magnifying-glass">
+    Filter tests by name or file path
+  </Card>
+  
+  <Card title="Tags" icon="tags">
+    Filter by test tags: `@smoke`, `@slow`, etc.
+  </Card>
+</CardGroup>
+
+### Action Timeline
+
+When a test is selected, see:
+- Every action executed
+- Screenshots before/after each action
+- Network requests
+- Console logs
+- Execution timing
+
+### Watch Mode
+
+<Note>
+UI Mode automatically watches for file changes. When you save a test file, it re-runs affected tests.
+</Note>
+
+## Running Tests
+
+### Run All Tests
+
+Click the "Run All" button or press `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (Mac).
+
+### Run Single Test
+
+```typescript example.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('example test', async ({ page }) => {
+  await page.goto('https://example.com');
+  await expect(page.locator('h1')).toHaveText('Example Domain');
+});
+```
+
+Click the play button next to the test name to run only that test.
+
+### Run Test File
+
+Click the play button next to a file name to run all tests in that file.
+
+### Run by Project
+
+Run tests only in specific browsers:
+1. Use project filter dropdown
+2. Select Chromium, Firefox, or WebKit
+3. Run tests
+
+## Time Travel Debugging
+
+One of UI Mode's most powerful features:
+
+### How It Works
+
+1. Run a test in UI Mode
+2. Click any action in the timeline
+3. See the exact state of the page at that moment
+4. Hover over elements to inspect them
+5. Copy locators from the DOM
+
+### Debugging Failed Tests
+
+```typescript
+test('failing test example', async ({ page }) => {
+  await page.goto('https://example.com');
+  await page.click('button.submit');
+  
+  // This assertion fails
+  await expect(page.locator('.result')).toHaveText('Success');
+});
+```
+
+In UI Mode:
+1. Test fails and stops at the assertion
+2. Click on the failed action
+3. See the screenshot showing what was actually displayed
+4. Check the Console tab for errors
+5. Inspect the Network tab for failed requests
+6. Copy the correct locator
+
+## Live Trace View
+
+UI Mode records traces automatically:
+
+<Steps>
+  <Step title="Run Test">
+    Execute any test in UI Mode
+  </Step>
+  
+  <Step title="Click Action">
+    Click any action in the timeline
+  </Step>
+  
+  <Step title="Explore State">
+    View DOM snapshots, screenshots, network, and console
+  </Step>
+  
+  <Step title="Pick Locators">
+    Use Pick Locator tool to generate selectors
+  </Step>
+</Steps>
+
+<Info>
+Unlike the Trace Viewer which analyzes saved traces, UI Mode provides live trace viewing as tests run.
+</Info>
+
+## Pick Locator Tool
+
+Build selectors interactively:
+
+1. Click "Pick Locator" button
+2. Hover over elements in the page snapshot
+3. Click an element
+4. UI Mode generates the best locator:
+   ```typescript
+   page.getByRole('button', { name: 'Submit' })
+   page.getByText('Welcome')
+   page.getByTestId('user-menu')
+   ```
+5. Copy and paste into your test
+
+## Watch Mode
+
+UI Mode watches for changes:
+
+### What Triggers Re-runs
+
+- Saving test files (`.spec.ts`, `.spec.js`)
+- Saving helper files imported by tests
+- Changes to page objects or fixtures
+
+### What Doesn't Trigger Re-runs
+
+- Config file changes (restart UI Mode)
+- Installing new dependencies
+- Changes to unrelated files
+
+### Customizing Watch Behavior
+
+```typescript playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  // Run tests in parallel in UI mode
+  workers: process.env.CI ? 1 : 2,
+  
+  use: {
+    // Collect traces in UI mode
+    trace: 'on',
+  },
+});
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd+Shift+R` | Run all tests |
+| `Ctrl/Cmd+R` | Re-run last test |
+| `Ctrl/Cmd+F` | Focus search box |
+| `Ctrl/Cmd+Shift+C` | Pick locator |
+| `Esc` | Stop running tests |
+| `F5` | Reload UI Mode |
+
+## UI Mode Features
+
+### Multiple Projects
+
+Run tests across browsers:
+
+```typescript playwright.config.ts
+export default defineConfig({
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'Mobile Chrome', use: { ...devices['Pixel 5'] } },
+  ],
+});
+```
+
+In UI Mode:
+- See tests grouped by project
+- Run all projects or select specific ones
+- Compare results across browsers
+
+### Error Messages
+
+When tests fail, UI Mode displays:
+- Full error stack trace
+- Expected vs actual values
+- Diff viewer for complex objects
+- Link to source code line
+
+### Console Output
+
+View all console messages:
+
+```typescript
+test('console example', async ({ page }) => {
+  page.on('console', msg => console.log(msg.text()));
+  
+  await page.goto('https://example.com');
+  
+  await page.evaluate(() => {
+    console.log('Page loaded');
+    console.error('This appears in UI Mode');
+  });
+});
+```
+
+Console tab shows:
+- All `console.*` calls from the browser
+- Test runner logs
+- Uncaught exceptions
+
+### Network Panel
+
+Inspect all network activity:
+- XHR/Fetch requests
+- Resource loads (images, CSS, JS)
+- API calls
+- WebSocket connections
+
+Click any request to see:
+- Request URL and method
+- Request/response headers
+- Response body
+- Timing information
+
+## Using UI Mode for Development
+
+### TDD Workflow
+
+```typescript new-feature.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('new feature', async ({ page }) => {
+  // 1. Start UI Mode: npx playwright test --ui
+  
+  // 2. Write test (it fails)
+  await page.goto('https://example.com/feature');
+  await page.click('button.new-feature');
+  await expect(page.locator('.result')).toBeVisible();
+  
+  // 3. See failure in UI Mode
+  // 4. Fix application code
+  // 5. Test re-runs automatically
+  // 6. Repeat until passing
+});
+```
+
+### Debugging Flaky Tests
+
+```bash
+# Run the same test multiple times
+npx playwright test flaky.spec.ts --ui --repeat-each=10
+```
+
+In UI Mode:
+1. Watch tests run repeatedly
+2. See which attempts fail
+3. Compare traces between passing and failing runs
+4. Identify timing issues or race conditions
+
+## UI Mode vs Other Tools
+
+<Tabs>
+  <Tab title="UI Mode">
+    **Best for:**
+    - Active test development
+    - Quick feedback loops
+    - Comparing browser behaviors
+    - Watch mode workflows
+    
+    **Features:**
+    - Live updates on file save
+    - Run specific tests easily
+    - Multi-project visualization
+  </Tab>
+  
+  <Tab title="Inspector">
+    **Best for:**
+    - Step-by-step debugging
+    - Pausing execution
+    - Inspecting individual actions
+    
+    **Features:**
+    - Breakpoints
+    - Step through actions
+    - Line-by-line execution
+  </Tab>
+  
+  <Tab title="Trace Viewer">
+    **Best for:**
+    - Post-mortem analysis
+    - CI/CD debugging
+    - Sharing test results
+    
+    **Features:**
+    - Analyze saved traces
+    - No test re-execution needed
+    - Works with CI artifacts
+  </Tab>
+</Tabs>
+
+## Command Line Options
+
+From `/home/daytona/workspace/source/packages/playwright/src/program.ts:435`, UI Mode supports:
+
+```bash
+# Basic UI mode
+npx playwright test --ui
+
+# Open in browser with specific host
+npx playwright test --ui-host=127.0.0.1
+
+# Custom port (0 for any free port)
+npx playwright test --ui-port=9323
+
+# Combine with other test options
+npx playwright test --ui --project=chromium --headed
+
+# Run specific tests in UI mode
+npx playwright test example.spec.ts --ui
+
+# Use with grep
+npx playwright test --ui -g "login"
+```
+
+## Remote UI Mode
+
+Run UI Mode on a remote server:
+
+```bash
+# On remote machine
+npx playwright test --ui-host=0.0.0.0 --ui-port=9323
+
+# Access from local machine
+open http://remote-machine:9323
+```
+
+<Warning>
+Be cautious when exposing UI Mode on a public network. Use SSH tunneling or VPN for secure access.
+</Warning>
+
+### SSH Tunnel Example
+
+```bash
+# Local machine: Create tunnel
+ssh -L 9323:localhost:9323 user@remote-machine
+
+# Remote machine: Start UI Mode
+npx playwright test --ui-host=127.0.0.1 --ui-port=9323
+
+# Local machine: Access UI Mode
+open http://localhost:9323
+```
+
+## Tips and Tricks
+
+<CardGroup cols={2}>
+  <Card title="Use Tags" icon="tag">
+    Add `@slow` or `@smoke` tags to filter tests quickly
+  </Card>
+  
+  <Card title="Multiple Windows" icon="window-restore">
+    Open multiple UI Mode instances for different test suites
+  </Card>
+  
+  <Card title="Headed Mode" icon="eye">
+    Add `--headed` to see actual browser windows alongside UI Mode
+  </Card>
+  
+  <Card title="Save Traces" icon="download">
+    Click "Export" to save traces for later analysis
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Inspector](/tools/inspector) - Step through tests with breakpoints
+- [Trace Viewer](/tools/trace-viewer) - Analyze saved trace files
+- [Code Generator](/tools/codegen) - Generate test code interactively

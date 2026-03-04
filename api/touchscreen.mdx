@@ -1,0 +1,49 @@
+---
+title: Touchscreen
+description: API reference for the Playwright Touchscreen class for simulating touch interactions.
+---
+
+The Touchscreen class provides methods to simulate touch interactions on touch-enabled devices. Access the Touchscreen instance through `page.touchscreen`.
+
+## Methods
+
+### tap
+
+Simulates a tap at the specified position.
+
+```javascript
+await page.touchscreen.tap(100, 200);
+```
+
+<ParamField path="x" type="number" required>
+  The x coordinate to tap at
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  The y coordinate to tap at
+</ParamField>
+
+## Example Usage
+
+### Tap an Element
+
+```javascript
+const button = await page.locator('button');
+const box = await button.boundingBox();
+if (box) {
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+}
+```
+
+### Multiple Taps
+
+```javascript
+// Tap multiple locations
+await page.touchscreen.tap(100, 100);
+await page.touchscreen.tap(200, 200);
+await page.touchscreen.tap(300, 300);
+```
+
+<Note>
+  For more complex touch interactions, consider using `page.tap(selector)` which handles element positioning automatically.
+</Note>

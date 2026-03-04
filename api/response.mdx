@@ -1,0 +1,315 @@
+---
+title: Response
+description: API reference for the Playwright Response class for handling network responses.
+---
+
+The Response class represents responses received by pages. Responses are emitted when the page receives an HTTP response for a request.
+
+## Methods
+
+### url
+
+Returns the URL of the response.
+
+```javascript
+const url = response.url();
+console.log(url);
+```
+
+**Returns:** `string`
+
+---
+
+### ok
+
+Returns whether the response was successful (status in the range 200-299).
+
+```javascript
+if (response.ok()) {
+  console.log('Success!');
+}
+```
+
+**Returns:** `boolean`
+
+---
+
+### status
+
+Returns the HTTP status code.
+
+```javascript
+const status = response.status();
+console.log(status); // 200, 404, etc.
+```
+
+**Returns:** `number`
+
+---
+
+### statusText
+
+Returns the HTTP status text.
+
+```javascript
+const text = response.statusText();
+console.log(text); // 'OK', 'Not Found', etc.
+```
+
+**Returns:** `string`
+
+---
+
+### headers
+
+Returns the response headers.
+
+```javascript
+const headers = response.headers();
+console.log(headers['content-type']);
+```
+
+**Returns:** `Object`
+
+<Warning>
+  This method returns provisional headers. Use `allHeaders()` for actual headers received over the network.
+</Warning>
+
+---
+
+### allHeaders
+
+Returns all response headers.
+
+```javascript
+const headers = await response.allHeaders();
+console.log(headers);
+```
+
+**Returns:** `Promise<Object>`
+
+---
+
+### headersArray
+
+Returns the response headers as an array of objects.
+
+```javascript
+const headers = await response.headersArray();
+console.log(headers); // [{ name: 'content-type', value: 'application/json' }, ...]
+```
+
+**Returns:** `Promise<Array<{name: string, value: string}>>`
+
+---
+
+### headerValue
+
+Returns the value of a specific header.
+
+```javascript
+const contentType = await response.headerValue('content-type');
+console.log(contentType);
+```
+
+<ParamField path="name" type="string" required>
+  The header name (case-insensitive)
+</ParamField>
+
+**Returns:** `Promise<string | null>`
+
+---
+
+### headerValues
+
+Returns all values of a specific header.
+
+```javascript
+const cookies = await response.headerValues('set-cookie');
+console.log(cookies);
+```
+
+<ParamField path="name" type="string" required>
+  The header name (case-insensitive)
+</ParamField>
+
+**Returns:** `Promise<string[]>`
+
+---
+
+### body
+
+Returns the response body as a Buffer.
+
+```javascript
+const buffer = await response.body();
+console.log(buffer);
+```
+
+**Returns:** `Promise<Buffer>`
+
+---
+
+### text
+
+Returns the response body as text.
+
+```javascript
+const text = await response.text();
+console.log(text);
+```
+
+**Returns:** `Promise<string>`
+
+---
+
+### json
+
+Parses the response body as JSON.
+
+```javascript
+const data = await response.json();
+console.log(data);
+```
+
+**Returns:** `Promise<object>`
+
+---
+
+### request
+
+Returns the request that initiated this response.
+
+```javascript
+const request = response.request();
+console.log(request.url());
+```
+
+**Returns:** `Request`
+
+---
+
+### frame
+
+Returns the frame that initiated the request.
+
+```javascript
+const frame = response.frame();
+console.log(frame.url());
+```
+
+**Returns:** `Frame`
+
+---
+
+### fromServiceWorker
+
+Returns whether the response was served by a service worker.
+
+```javascript
+if (response.fromServiceWorker()) {
+  console.log('Served by service worker');
+}
+```
+
+**Returns:** `boolean`
+
+---
+
+### finished
+
+Waits for the response to finish loading.
+
+```javascript
+await response.finished();
+console.log('Response finished loading');
+```
+
+**Returns:** `Promise<null>`
+
+---
+
+### serverAddr
+
+Returns the server IP address and port.
+
+```javascript
+const addr = await response.serverAddr();
+if (addr) {
+  console.log(`${addr.ipAddress}:${addr.port}`);
+}
+```
+
+**Returns:** `Promise<{ipAddress: string, port: number} | null>`
+
+---
+
+### securityDetails
+
+Returns SSL and other security information.
+
+```javascript
+const details = await response.securityDetails();
+if (details) {
+  console.log('Protocol:', details.protocol);
+  console.log('Issuer:', details.issuer);
+}
+```
+
+**Returns:** `Promise<Object | null>`
+
+---
+
+### httpVersion
+
+Returns the HTTP version.
+
+```javascript
+const version = await response.httpVersion();
+console.log(version); // 'HTTP/1.1', 'HTTP/2', etc.
+```
+
+**Returns:** `Promise<string>`
+
+## Example Usage
+
+### Monitor API Responses
+
+```javascript
+page.on('response', async response => {
+  if (response.url().includes('/api/')) {
+    console.log('API Response:', response.status());
+    const data = await response.json();
+    console.log('Data:', data);
+  }
+});
+```
+
+### Check Response Status
+
+```javascript
+page.on('response', response => {
+  if (!response.ok()) {
+    console.log('Failed response:', response.url(), response.status());
+  }
+});
+```
+
+### Extract Response Headers
+
+```javascript
+page.on('response', async response => {
+  const contentType = await response.headerValue('content-type');
+  console.log('Content-Type:', contentType);
+});
+```
+
+### Wait for Specific Response
+
+```javascript
+const response = await page.waitForResponse(resp => 
+  resp.url().includes('/api/data') && resp.status() === 200
+);
+const data = await response.json();
+console.log(data);
+```

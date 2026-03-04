@@ -1,0 +1,421 @@
+---
+title: 'Mobile Emulation'
+description: 'Test mobile web applications with Playwright using device emulation for responsive design and mobile-specific features'
+---
+
+## Overview
+
+Playwright provides comprehensive mobile emulation capabilities, allowing you to test mobile web applications without physical devices. Test responsive designs, touch interactions, and mobile-specific features across different device configurations.
+
+## Device Emulation
+
+### Using Predefined Devices
+
+Playwright includes a registry of popular devices:
+
+```typescript
+import { test, expect, devices } from '@playwright/test';
+
+test.use(devices['iPhone 13 Pro']);
+
+test('mobile homepage', async ({ page }) => {
+  await page.goto('https://example.com');
+  await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
+});
+```
+
+### Available Device Profiles
+
+<CodeGroup>
+```typescript iPhone
+import { devices } from '@playwright/test';
+
+test.use(devices['iPhone 13 Pro']);
+test.use(devices['iPhone 12']);
+test.use(devices['iPhone SE']);
+```
+
+```typescript Android
+import { devices } from '@playwright/test';
+
+test.use(devices['Pixel 5']);
+test.use(devices['Galaxy S9+']);
+test.use(devices['Nexus 7']);
+```
+
+```typescript iPad
+import { devices } from '@playwright/test';
+
+test.use(devices['iPad Pro']);
+test.use(devices['iPad Mini']);
+```
+</CodeGroup>
+
+### Configure Mobile Projects
+
+Test across multiple devices in your configuration:
+
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    {
+      name: 'Mobile Chrome',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 12'] },
+    },
+    {
+      name: 'Tablet',
+      use: { ...devices['iPad Pro'] },
+    },
+  ],
+});
+```
+
+## Custom Device Configuration
+
+### Create Custom Device Profile
+
+Define custom viewport and device characteristics:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({
+  viewport: { width: 390, height: 844 },
+  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15',
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+  defaultBrowserType: 'webkit',
+});
+
+test('custom device', async ({ page }) => {
+  await page.goto('https://example.com');
+  // Test with custom configuration
+});
+```
+
+### Viewport Configuration
+
+<Steps>
+  <Step title="Set viewport size">
+    ```typescript
+    await page.setViewportSize({ width: 375, height: 667 });
+    ```
+  </Step>
+
+  <Step title="Get current viewport">
+    ```typescript
+    const viewport = page.viewportSize();
+    console.log(`Width: ${viewport.width}, Height: ${viewport.height}`);
+    ```
+  </Step>
+
+  <Step title="Test responsive breakpoints">
+    ```typescript
+    const breakpoints = [
+      { width: 320, height: 568 },  // Small phone
+      { width: 375, height: 667 },  // Medium phone
+      { width: 414, height: 896 },  // Large phone
+      { width: 768, height: 1024 }, // Tablet
+    ];
+
+    for (const size of breakpoints) {
+      await page.setViewportSize(size);
+      await page.screenshot({ 
+        path: `responsive-${size.width}x${size.height}.png` 
+      });
+    }
+    ```
+  </Step>
+</Steps>
+
+## Mobile-Specific Features
+
+### Touch Events
+
+Simulate touch interactions:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({ hasTouch: true });
+
+test('swipe gallery', async ({ page }) => {
+  await page.goto('https://example.com/gallery');
+  
+  const gallery = page.locator('.gallery');
+  
+  // Swipe left
+  await gallery.dispatchEvent('touchstart', { 
+    touches: [{ clientX: 300, clientY: 200 }] 
+  });
+  await gallery.dispatchEvent('touchmove', { 
+    touches: [{ clientX: 100, clientY: 200 }] 
+  });
+  await gallery.dispatchEvent('touchend', {});
+  
+  await expect(page.locator('.gallery-item-2')).toBeVisible();
+});
+```
+
+### Geolocation
+
+Set device location:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('location-based search', async ({ context, page }) => {
+  // Grant geolocation permission
+  await context.grantPermissions(['geolocation']);
+  
+  // Set location to New York
+  await context.setGeolocation({
+    latitude: 40.7128,
+    longitude: -74.0060,
+  });
+  
+  await page.goto('https://example.com/stores');
+  await page.click('text=Find nearby stores');
+  
+  await expect(page.getByText('New York')).toBeVisible();
+});
+```
+
+### Device Orientation
+
+```typescript
+import { test, expect, devices } from '@playwright/test';
+
+test('rotate device', async ({ browser }) => {
+  const context = await browser.newContext({
+    ...devices['iPhone 12'],
+  });
+  
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+  
+  // Portrait mode (default)
+  await expect(page.locator('.portrait-content')).toBeVisible();
+  
+  // Switch to landscape
+  await context.close();
+  const landscapeContext = await browser.newContext({
+    ...devices['iPhone 12 landscape'],
+  });
+  
+  const landscapePage = await landscapeContext.newPage();
+  await landscapePage.goto('https://example.com');
+  await expect(landscapePage.locator('.landscape-content')).toBeVisible();
+});
+```
+
+## Network Conditions
+
+### Simulate Mobile Networks
+
+Emulate slow mobile networks:
+
+```typescript
+import { test, expect, devices } from '@playwright/test';
+import { chromium } from 'playwright';
+
+test('slow 3G network', async () => {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    ...devices['Pixel 5'],
+  });
+  
+  // Emulate slow network
+  const client = await context.newCDPSession(await context.newPage());
+  await client.send('Network.emulateNetworkConditions', {
+    offline: false,
+    downloadThroughput: 500 * 1024 / 8,  // 500 Kbps
+    uploadThroughput: 500 * 1024 / 8,
+    latency: 400, // ms
+  });
+  
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+  
+  // Test app behavior on slow network
+  await expect(page.locator('.loading-spinner')).toBeVisible();
+});
+```
+
+## Practical Examples
+
+### Responsive Navigation Menu
+
+```typescript
+import { test, expect, devices } from '@playwright/test';
+
+test.describe('responsive navigation', () => {
+  test('desktop menu', async ({ page }) => {
+    await page.goto('https://example.com');
+    
+    // Desktop shows horizontal menu
+    await expect(page.locator('nav.desktop-menu')).toBeVisible();
+    await expect(page.locator('button.hamburger')).not.toBeVisible();
+  });
+
+  test('mobile menu', async ({ page }) => {
+    test.use(devices['iPhone 12']);
+    
+    await page.goto('https://example.com');
+    
+    // Mobile shows hamburger menu
+    await expect(page.locator('nav.desktop-menu')).not.toBeVisible();
+    
+    const hamburger = page.locator('button.hamburger');
+    await expect(hamburger).toBeVisible();
+    await hamburger.click();
+    
+    // Mobile menu opens
+    await expect(page.locator('nav.mobile-menu')).toBeVisible();
+  });
+});
+```
+
+### Mobile Form Testing
+
+```typescript
+import { test, expect, devices } from '@playwright/test';
+
+test.use(devices['Pixel 5']);
+
+test('mobile checkout form', async ({ page }) => {
+  await page.goto('https://example.com/checkout');
+  
+  // Test mobile keyboard behavior
+  const phoneInput = page.getByLabel('Phone');
+  await phoneInput.focus();
+  
+  // Verify numeric keyboard is triggered
+  const inputType = await phoneInput.getAttribute('type');
+  expect(inputType).toBe('tel');
+  
+  // Fill form
+  await phoneInput.fill('555-0123');
+  await page.getByLabel('Email').fill('user@example.com');
+  await page.getByLabel('Address').fill('123 Main St');
+  
+  // Submit with mobile viewport
+  await page.getByRole('button', { name: 'Complete Order' }).click();
+  
+  await expect(page.getByText('Order confirmed')).toBeVisible();
+});
+```
+
+### Testing Pull-to-Refresh
+
+```typescript
+import { test, expect, devices } from '@playwright/test';
+
+test.use(devices['iPhone 13 Pro']);
+
+test('pull to refresh', async ({ page }) => {
+  await page.goto('https://example.com/feed');
+  
+  const initialItems = await page.locator('.feed-item').count();
+  
+  // Simulate pull-to-refresh gesture
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
+  
+  await page.mouse.move(200, 100);
+  await page.mouse.down();
+  await page.mouse.move(200, 300);
+  await page.mouse.up();
+  
+  // Wait for refresh animation
+  await page.waitForTimeout(1000);
+  
+  const refreshedItems = await page.locator('.feed-item').count();
+  expect(refreshedItems).toBeGreaterThan(initialItems);
+});
+```
+
+## CI/CD Configuration
+
+Test mobile configurations in CI pipelines:
+
+```yaml
+name: Mobile Tests
+
+on: [push, pull_request]
+
+jobs:
+  mobile-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        device: [iPhone, Android, iPad]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test --project="Mobile ${{ matrix.device }}"
+```
+
+## Best Practices
+
+<Tip>
+  **Test Real Devices**: While emulation is excellent for development, always validate on real devices before production release.
+</Tip>
+
+- **Test popular devices**: Focus on devices your users actually use (check analytics)
+- **Test both orientations**: Ensure your app works in portrait and landscape modes
+- **Test touch interactions**: Mobile users interact differently than desktop users
+- **Test with slow networks**: Many mobile users have unreliable connections
+- **Use device-specific user agents**: Some sites serve different content based on user agent
+- **Test mobile-specific features**: Camera access, geolocation, device orientation, etc.
+
+<Note>
+  Device emulation provides good approximation but cannot replicate all aspects of real devices, such as GPU performance or specific browser engine quirks.
+</Note>
+
+## Troubleshooting
+
+### Touch events not working
+
+Ensure `hasTouch` is enabled:
+
+```typescript
+test.use({
+  hasTouch: true,
+  isMobile: true,
+});
+```
+
+### Viewport not changing
+
+Verify viewport is set before navigation:
+
+```typescript
+await page.setViewportSize({ width: 375, height: 667 });
+await page.goto('https://example.com');
+```
+
+### Mobile menu not appearing
+
+Check viewport width matches your CSS breakpoints:
+
+```typescript
+const viewport = page.viewportSize();
+console.log('Current viewport:', viewport);
+```
+
+<Warning>
+  Some websites detect automation and may serve different content. This can affect mobile testing accuracy.
+</Warning>

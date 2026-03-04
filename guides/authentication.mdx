@@ -1,0 +1,269 @@
+---
+title: 'Authentication'
+description: 'Authenticate users in Playwright tests with cookies, storage state, and reusable authentication setup'
+---
+
+## Overview
+
+Playwright provides powerful authentication mechanisms to handle user login flows efficiently. Instead of logging in before every test, you can authenticate once and reuse the authentication state across all tests.
+
+## Authentication Strategies
+
+### Storage State API
+
+The most efficient way to handle authentication is to save the authentication state (cookies and localStorage) after login and reuse it in subsequent tests.
+
+<Steps>
+  <Step title="Perform initial login">
+    Create a setup script that logs in and saves the authentication state:
+
+    ```typescript
+    import { test as setup } from '@playwright/test';
+
+    setup('authenticate', async ({ page }) => {
+      await page.goto('https://github.com/login');
+      await page.fill('input[name="login"]', process.env.GITHUB_USER);
+      await page.fill('input[name="password"]', process.env.GITHUB_PWD);
+      await page.click('input[type="submit"]');
+      
+      // Wait for the final URL to ensure successful login
+      await page.waitForURL('https://github.com/');
+      
+      // Save authentication state
+      await page.context().storageState({ 
+        path: 'auth.json' 
+      });
+    });
+    ```
+  </Step>
+
+  <Step title="Configure tests to use saved state">
+    Update your `playwright.config.ts` to use the saved authentication state:
+
+    ```typescript
+    import { defineConfig } from '@playwright/test';
+
+    export default defineConfig({
+      use: {
+        // Load authentication state before each test
+        storageState: 'auth.json',
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Use authenticated context in tests">
+    All tests will now start with the authenticated state:
+
+    ```typescript
+    import { test, expect } from '@playwright/test';
+
+    test('create new repository', async ({ page }) => {
+      // Already authenticated - no need to login
+      await page.goto('https://github.com/new');
+      await expect(page.getByRole('heading', { 
+        name: 'Create a new repository' 
+      })).toBeVisible();
+    });
+    ```
+  </Step>
+</Steps>
+
+### Manual Cookie Management
+
+For more control, you can manually set cookies in the browser context:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('use custom cookies', async ({ context }) => {
+  await context.addCookies([
+    {
+      name: 'session_id',
+      value: 'abc123',
+      domain: 'example.com',
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+    },
+  ]);
+
+  const page = await context.newPage();
+  await page.goto('https://example.com/dashboard');
+  
+  // Verify cookie was set
+  const cookies = await context.cookies();
+  expect(cookies).toContainEqual(
+    expect.objectContaining({ name: 'session_id' })
+  );
+});
+```
+
+### Local Storage Setup
+
+Set localStorage items for authentication:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({
+  storageState: {
+    cookies: [],
+    origins: [
+      {
+        origin: 'https://example.com',
+        localStorage: [
+          {
+            name: 'auth_token',
+            value: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+          },
+          {
+            name: 'user_id',
+            value: '12345',
+          },
+        ],
+      },
+    ],
+  },
+});
+
+test('access protected page', async ({ page }) => {
+  await page.goto('https://example.com/profile');
+  
+  // Verify localStorage was set
+  const token = await page.evaluate(() => 
+    localStorage.getItem('auth_token')
+  );
+  expect(token).toBeTruthy();
+});
+```
+
+## Multiple Authentication States
+
+Test scenarios with different user roles by creating multiple authentication states:
+
+<CodeGroup>
+```typescript admin.setup.ts
+import { test as setup } from '@playwright/test';
+
+setup('authenticate as admin', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  await page.fill('#username', 'admin@example.com');
+  await page.fill('#password', process.env.ADMIN_PASSWORD);
+  await page.click('button[type="submit"]');
+  
+  await page.waitForURL('**/dashboard');
+  await page.context().storageState({ path: 'admin-auth.json' });
+});
+```
+
+```typescript user.setup.ts
+import { test as setup } from '@playwright/test';
+
+setup('authenticate as user', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  await page.fill('#username', 'user@example.com');
+  await page.fill('#password', process.env.USER_PASSWORD);
+  await page.click('button[type="submit"]');
+  
+  await page.waitForURL('**/home');
+  await page.context().storageState({ path: 'user-auth.json' });
+});
+```
+
+```typescript playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    {
+      name: 'setup',
+      testMatch: '**/*.setup.ts',
+    },
+    {
+      name: 'admin tests',
+      use: { storageState: 'admin-auth.json' },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'user tests',
+      use: { storageState: 'user-auth.json' },
+      dependencies: ['setup'],
+    },
+  ],
+});
+```
+</CodeGroup>
+
+## API Authentication
+
+Authenticate API requests using the request context:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({
+  baseURL: 'https://api.github.com',
+  extraHTTPHeaders: {
+    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': `token ${process.env.API_TOKEN}`,
+  },
+});
+
+test('create and delete repository', async ({ request }) => {
+  // Create repository
+  const response = await request.post('/user/repos', {
+    data: { name: 'test-repo' },
+  });
+  expect(response.ok()).toBeTruthy();
+  
+  // Delete repository
+  const deleteResponse = await request.delete(
+    `/repos/${process.env.GITHUB_USER}/test-repo`
+  );
+  expect(deleteResponse.ok()).toBeTruthy();
+});
+```
+
+<Note>
+  Store authentication credentials in environment variables, never commit them to version control.
+</Note>
+
+## Best Practices
+
+<Tip>
+  **Reuse Authentication State**: Authenticate once in a setup project and reuse the state across all tests to significantly improve test execution time.
+</Tip>
+
+- **Separate setup from tests**: Use dedicated setup projects for authentication
+- **Use environment variables**: Store credentials securely in `.env` files
+- **Test multiple roles**: Create separate authentication states for different user roles
+- **Verify authentication**: Always check that authentication succeeded before saving state
+- **Handle token expiration**: Implement logic to refresh tokens when they expire
+
+## Troubleshooting
+
+### Authentication state not persisting
+
+Ensure you're saving the storage state after the page has fully loaded and authentication is complete:
+
+```typescript
+await page.waitForURL('**/dashboard');
+// Wait for any additional async operations
+await page.waitForLoadState('networkidle');
+await page.context().storageState({ path: 'auth.json' });
+```
+
+### Cookies not being set correctly
+
+Verify the cookie domain and path match your application:
+
+```typescript
+const cookies = await context.cookies();
+console.log('Current cookies:', cookies);
+```
+
+<Warning>
+  Authentication state is sensitive data. Add `*.json` files containing authentication state to your `.gitignore` file.
+</Warning>

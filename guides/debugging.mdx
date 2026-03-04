@@ -1,0 +1,445 @@
+---
+title: 'Debugging'
+description: 'Debug Playwright tests with Inspector, VS Code debugger, trace viewer, and other powerful debugging tools'
+---
+
+## Overview
+
+Playwright provides comprehensive debugging tools to help you understand test failures and optimize test execution. From interactive inspectors to detailed trace viewers, you have multiple options for debugging at different stages.
+
+## Playwright Inspector
+
+The Playwright Inspector is a GUI tool that lets you step through tests, live edit locators, and inspect actionability logs.
+
+### Debug Mode
+
+Run tests in debug mode to open the Inspector:
+
+<CodeGroup>
+```bash All Tests
+npx playwright test --debug
+```
+
+```bash Single Test
+npx playwright test example.spec.ts:10 --debug
+```
+
+```bash Specific Browser
+npx playwright test --project=chromium --debug
+```
+
+```bash Specific Test File
+npx playwright test tests/login.spec.ts --debug
+```
+</CodeGroup>
+
+<Note>
+  When `--debug` flag is used, tests run in headed mode and default timeout is set to 0 (no timeout).
+</Note>
+
+### Inspector Features
+
+<Steps>
+  <Step title="Step through tests">
+    Use the step controls to execute your test line by line:
+    - **Step Over**: Execute current line and move to next
+    - **Step Into**: Enter function calls
+    - **Step Out**: Complete current function
+    - **Continue**: Run until next breakpoint
+  </Step>
+
+  <Step title="Pick locators">
+    Click the "Pick Locator" button, then click elements in the browser to generate locators automatically.
+  </Step>
+
+  <Step title="View actionability logs">
+    See why actions succeed or fail with detailed logs showing:
+    - Element visibility
+    - Element position
+    - Element state
+  </Step>
+
+  <Step title="Edit locators live">
+    Modify locators in the inspector and see them highlighted in the browser in real-time.
+  </Step>
+</Steps>
+
+## VS Code Debugger
+
+### Using the VS Code Extension
+
+The Playwright VS Code extension provides the best debugging experience:
+
+<Steps>
+  <Step title="Install the extension">
+    Install the official [Playwright Test for VSCode](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright) extension.
+  </Step>
+
+  <Step title="Set breakpoints">
+    Click next to line numbers to set breakpoints (red dots appear).
+  </Step>
+
+  <Step title="Run in debug mode">
+    Right-click the line number next to a test and select "Debug Test".
+  </Step>
+
+  <Step title="Use debug controls">
+    Use VS Code's debug toolbar to step through code, inspect variables, and evaluate expressions.
+  </Step>
+</Steps>
+
+### Debug Configuration
+
+Create a `.vscode/launch.json` for custom debug configurations:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Playwright Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/@playwright/test/cli.js",
+      "args": ["test", "--headed"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}
+```
+
+## Trace Viewer
+
+### Enable Trace Recording
+
+Configure trace recording in `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    trace: 'on-first-retry',
+    // trace: 'on', // Record all tests
+    // trace: 'retain-on-failure', // Only failed tests
+    // trace: 'off', // Disable tracing
+  },
+});
+```
+
+### View Traces
+
+Open trace files after test execution:
+
+```bash
+npx playwright show-trace trace.zip
+```
+
+Or view all traces from the HTML report:
+
+```bash
+npx playwright show-report
+```
+
+### Trace Viewer Features
+
+The trace viewer provides comprehensive debugging information:
+
+- **Action timeline**: See every action taken during the test
+- **Screenshots**: Visual snapshots at each step
+- **DOM snapshots**: Explore the DOM state at any point
+- **Network activity**: Inspect all network requests and responses
+- **Console logs**: View console output
+- **Source code**: See which line of code triggered each action
+- **Call stack**: Understand the execution flow
+
+## Console Output
+
+### Page Console Logs
+
+Capture browser console messages:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('capture console logs', async ({ page }) => {
+  page.on('console', msg => {
+    console.log(`Browser console [${msg.type()}]: ${msg.text()}`);
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+### Debug with console.log
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('debug test', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const title = await page.title();
+  console.log('Page title:', title);
+  
+  const count = await page.locator('.item').count();
+  console.log('Item count:', count);
+  
+  await expect(page.locator('.header')).toBeVisible();
+});
+```
+
+### Verbose Logging
+
+Enable detailed Playwright logs:
+
+```bash
+DEBUG=pw:api npx playwright test
+```
+
+Or set specific debug channels:
+
+```bash
+DEBUG=pw:browser npx playwright test
+DEBUG=pw:protocol npx playwright test
+DEBUG=pw:* npx playwright test
+```
+
+## Pause Execution
+
+### Using page.pause()
+
+Pause test execution at any point:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('pause for inspection', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Pause here to inspect the page
+  await page.pause();
+  
+  await page.click('text=Login');
+});
+```
+
+This opens the Playwright Inspector where you can:
+- Inspect the current page state
+- Try out locators
+- Step through remaining test code
+- Resume execution
+
+### Conditional Breakpoints
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('conditional debug', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const items = await page.locator('.item').all();
+  
+  for (let i = 0; i < items.length; i++) {
+    const text = await items[i].textContent();
+    
+    // Pause only when specific condition is met
+    if (text?.includes('error')) {
+      await page.pause();
+    }
+  }
+});
+```
+
+## Headed Mode
+
+Run tests with visible browser for visual debugging:
+
+```bash
+npx playwright test --headed
+```
+
+Or configure in `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    headless: false,
+    slowMo: 1000, // Slow down execution by 1 second
+  },
+});
+```
+
+## Screenshots and Videos
+
+### Debug with Screenshots
+
+```typescript
+import { test } from '@playwright/test';
+
+test('debug with screenshots', async ({ page }) => {
+  await page.goto('https://example.com');
+  await page.screenshot({ path: 'step1.png' });
+  
+  await page.click('text=Submit');
+  await page.screenshot({ path: 'step2.png' });
+  
+  await page.waitForSelector('.success');
+  await page.screenshot({ path: 'step3.png' });
+});
+```
+
+### Automatic Failure Screenshots
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+});
+```
+
+## Debugging Best Practices
+
+<Tip>
+  **Use Trace Viewer First**: For failed tests in CI, download and view traces before trying to reproduce locally.
+</Tip>
+
+- **Start with traces**: The trace viewer provides the most comprehensive debugging information
+- **Use VS Code extension**: For local development, the VS Code extension offers the best DX
+- **Add strategic page.pause()**: Insert pauses before complex operations
+- **Enable verbose logging**: Use DEBUG environment variable for detailed logs
+- **Slow down execution**: Use `slowMo` option to watch actions in real-time
+- **Capture screenshots**: Take screenshots at key points in your test
+- **Monitor network**: Check network tab in trace viewer for API issues
+
+## Common Debugging Scenarios
+
+### Element Not Found
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('debug missing element', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Check if element exists
+  const element = page.locator('.missing-element');
+  const count = await element.count();
+  console.log('Element count:', count);
+  
+  // Get all matching elements
+  if (count === 0) {
+    console.log('Element not found. Available elements:');
+    const body = await page.locator('body').innerHTML();
+    console.log(body);
+  }
+});
+```
+
+### Timeout Issues
+
+```typescript
+test('debug timeout', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Increase timeout and add logging
+  const element = page.locator('.slow-loading');
+  
+  console.log('Waiting for element...');
+  await element.waitFor({ timeout: 30000 });
+  console.log('Element appeared!');
+  
+  await element.click();
+});
+```
+
+### Flaky Tests
+
+```typescript
+test('debug flaky test', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Wait for stable state
+  await page.waitForLoadState('networkidle');
+  
+  // Add explicit waits
+  await expect(page.locator('.content')).toBeVisible();
+  await expect(page.locator('.content')).not.toHaveClass(/loading/);
+  
+  // Now perform action
+  await page.click('.button');
+});
+```
+
+## Debugging in CI
+
+### Upload Artifacts
+
+Configure CI to upload debugging artifacts:
+
+```yaml
+name: Playwright Tests
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test
+      
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+```
+
+### View CI Traces
+
+1. Download the `playwright-report` artifact from your CI run
+2. Extract the archive
+3. Run: `npx playwright show-report playwright-report/`
+
+<Warning>
+  Always record traces and screenshots in CI to debug failures without needing to reproduce them locally.
+</Warning>
+
+## Troubleshooting
+
+### Inspector not opening
+
+Verify you're using the `--debug` flag:
+
+```bash
+npx playwright test --debug
+```
+
+### VS Code extension not working
+
+Reload the VS Code window and ensure tests are detected:
+
+1. Open Command Palette (Cmd+Shift+P)
+2. Run "Playwright: Reload"
+
+### Traces not being recorded
+
+Verify trace configuration in `playwright.config.ts`:
+
+```typescript
+use: {
+  trace: 'on-first-retry',
+}
+```

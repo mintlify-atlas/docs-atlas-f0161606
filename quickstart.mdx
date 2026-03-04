@@ -1,80 +1,331 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Create and run your first Playwright test in minutes
 ---
 
-## Get started in three steps
+This guide walks you through creating and running your first Playwright test. By the end, you'll understand the basics of writing tests and interacting with web pages.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+<Info>
+Make sure you have [installed Playwright](/installation) before proceeding.
+</Info>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Create your first test
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Create a test file">
+    Create a new file called `example.spec.ts` in your `tests/` directory:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```typescript
+    import { test, expect } from '@playwright/test';
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    test('has title', async ({ page }) => {
+      await page.goto('https://playwright.dev/');
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+      // Expect a title "to contain" a substring.
+      await expect(page).toHaveTitle(/Playwright/);
+    });
+    ```
 
-### Step 3: Go live
+    This test navigates to the Playwright homepage and verifies the page title contains "Playwright".
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Run the test">
+    Execute your test using the Playwright Test runner:
+
+    ```bash
+    npx playwright test
+    ```
+
+    By default, tests run in headless mode across all configured browsers.
+  </Step>
+
+  <Step title="View results">
+    After the test completes, view the HTML report:
+
+    ```bash
+    npx playwright show-report
+    ```
+
+    The report shows test results, execution time, and any failures.
+  </Step>
+</Steps>
+
+## Running tests in different modes
+
+<Tabs>
+  <Tab title="Headless mode">
+    Default mode - browsers run without a UI:
+
+    ```bash
+    npx playwright test
+    ```
+  </Tab>
+
+  <Tab title="Headed mode">
+    Watch tests run in real browsers:
+
+    ```bash
+    npx playwright test --headed
+    ```
+  </Tab>
+
+  <Tab title="UI mode">
+    Interactive mode with time travel debugging:
+
+    ```bash
+    npx playwright test --ui
+    ```
+  </Tab>
+
+  <Tab title="Debug mode">
+    Step through tests with Playwright Inspector:
+
+    ```bash
+    npx playwright test --debug
+    ```
+  </Tab>
+</Tabs>
+
+## Real-world examples
+
+Here are practical examples from the Playwright repository demonstrating common testing patterns.
+
+### Example 1: Taking screenshots
+
+Navigate to a page and capture a screenshot:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('Page Screenshot', async ({ page }) => {
+  await page.goto('https://playwright.dev/');
+  await page.screenshot({ path: `example.png` });
+});
+```
+
+### Example 2: Interacting with forms
+
+Fill out a form and submit it:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('should add single todo', async ({ page }) => {
+  await page.goto('https://demo.playwright.dev/todomvc');
+
+  // Type into the input field
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .fill('Buy groceries');
+
+  // Verify the text appears
+  await expect(page.getByRole('textbox', { name: 'What needs to be done?' }))
+    .toHaveValue('Buy groceries');
+
+  // Submit by pressing Enter
+  await page.keyboard.press('Enter');
+
+  // Verify the todo appears in the list
+  await expect(page.getByText('Buy groceries')).toBeVisible();
+  await expect(page.getByText('1 item left')).toBeVisible();
+});
+```
+
+### Example 3: Mobile emulation
+
+Test mobile viewports with device emulation:
+
+```typescript
+import { test, devices } from '@playwright/test';
+
+test.use({
+  ...devices['iPhone 13 Pro'],
+  locale: 'en-US',
+  geolocation: { longitude: 12.492507, latitude: 41.889938 },
+  permissions: ['geolocation'],
+})
+
+test('Mobile and geolocation', async ({ page }) => {
+  await page.goto('https://maps.google.com');
+  await page.getByText('Your location').click();
+  await page.waitForRequest(/.*preview\/pwa/);
+  await page.screenshot({ path: 'colosseum-iphone.png' });
+});
+```
+
+### Example 4: Evaluating JavaScript
+
+Execute code in the browser context:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('Evaluate in browser context', async ({ page }) => {
+  await page.goto('https://www.example.com/');
+  const dimensions = await page.evaluate(() => {
+    return {
+      width: document.documentElement.clientWidth,
+      height: document.documentElement.clientHeight,
+      deviceScaleFactor: window.devicePixelRatio
+    }
+  });
+  console.log(dimensions);
+});
+```
+
+### Example 5: Network interception
+
+Intercept and log network requests:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('Intercept network requests', async ({ page }) => {
+  // Log and continue all network requests
+  await page.route('**', route => {
+    console.log(route.request().url());
+    route.continue();
+  });
+  await page.goto('http://todomvc.com');
+});
+```
+
+## Running specific tests
+
+<CodeGroup>
+
+```bash Single file
+npx playwright test example.spec.ts
+```
+
+```bash Single test by title
+npx playwright test -g "has title"
+```
+
+```bash Specific browser
+npx playwright test --project=chromium
+```
+
+```bash Multiple browsers
+npx playwright test --project=chromium --project=firefox
+```
+
+</CodeGroup>
+
+## Understanding test anatomy
+
+Every Playwright test follows this structure:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('test description', async ({ page }) => {
+  // 1. Setup - navigate to page
+  await page.goto('https://example.com');
+
+  // 2. Action - interact with elements
+  await page.getByRole('button', { name: 'Submit' }).click();
+
+  // 3. Assertion - verify expected behavior
+  await expect(page.getByText('Success')).toBeVisible();
+});
+```
+
+<Tip>
+**Auto-waiting**: Playwright automatically waits for elements to be actionable before performing actions. This eliminates the need for manual timeouts and makes tests more reliable.
+</Tip>
+
+## Common CLI commands
+
+<CardGroup cols={2}>
+  <Card title="Run all tests">
+    ```bash
+    npx playwright test
+    ```
+  </Card>
+  <Card title="Run with UI">
+    ```bash
+    npx playwright test --ui
+    ```
+  </Card>
+  <Card title="Generate code">
+    ```bash
+    npx playwright codegen
+    ```
+  </Card>
+  <Card title="Show report">
+    ```bash
+    npx playwright show-report
+    ```
+  </Card>
+</CardGroup>
+
+## Debugging tests
+
+<Steps>
+  <Step title="Add a breakpoint">
+    Use `await page.pause()` to pause execution:
+
+    ```typescript
+    test('debug example', async ({ page }) => {
+      await page.goto('https://example.com');
+      await page.pause(); // Execution pauses here
+      await page.getByRole('button').click();
+    });
+    ```
+  </Step>
+
+  <Step title="Run in debug mode">
+    ```bash
+    npx playwright test --debug
+    ```
+
+    This opens the Playwright Inspector with:
+    - Ability to step through test actions
+    - Pick locator tool
+    - Console for running commands
+    - Source code view
+  </Step>
+</Steps>
+
+<Note>
+The Playwright Inspector allows you to step through your test, explore locators, and execute commands in real-time.
+</Note>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Writing tests" icon="code" href="/writing-tests">
+    Learn best practices for writing tests
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure test runner options
+  </Card>
+  <Card title="Locators" icon="crosshairs" href="/locators">
+    Master element selection strategies
+  </Card>
+  <Card title="Assertions" icon="check" href="/assertions">
+    Understand web-first assertions
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Tips for getting started
+
+<AccordionGroup>
+  <Accordion title="Use Codegen to generate tests">
+    Run `npx playwright codegen example.com` to record browser interactions and generate test code automatically. This is a great way to learn Playwright's API.
+  </Accordion>
+
+  <Accordion title="Start with headed mode">
+    When writing tests, use `--headed` mode to see what's happening. Switch to headless mode for CI/CD.
+  </Accordion>
+
+  <Accordion title="Use VS Code extension">
+    Install the Playwright Test extension for VS Code to run tests directly from the editor with debugging support.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+**Common pitfall**: Don't forget `await` before Playwright actions. All Playwright methods are asynchronous and return Promises.
+</Warning>

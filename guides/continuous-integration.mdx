@@ -1,0 +1,555 @@
+---
+title: 'Continuous Integration'
+description: 'Run Playwright tests in CI/CD pipelines with GitHub Actions, GitLab CI, Jenkins, and other platforms'
+---
+
+## Overview
+
+Playwright tests integrate seamlessly with CI/CD pipelines. This guide covers best practices for running tests in continuous integration environments across popular platforms.
+
+## GitHub Actions
+
+### Basic Configuration
+
+Create `.github/workflows/playwright.yml`:
+
+```yaml
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      
+      - name: Run Playwright tests
+        run: npx playwright test
+      
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+```
+
+### Matrix Strategy
+
+Test across multiple browsers and Node.js versions:
+
+```yaml
+name: Playwright Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v6
+      
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+      
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test --project=${{ matrix.browser }}
+      
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.browser }}-node${{ matrix.node-version }}
+          path: playwright-report/
+```
+
+### Sharding Tests
+
+Run tests in parallel across multiple machines:
+
+```yaml
+name: Playwright Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      
+      - name: Run Playwright tests
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+      
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.shardIndex }}
+          path: playwright-report/
+```
+
+## GitLab CI
+
+### Basic Configuration
+
+Create `.gitlab-ci.yml`:
+
+```yaml
+stages:
+  - test
+
+playwright-tests:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.40.0-focal
+  script:
+    - npm ci
+    - npx playwright test
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+      - test-results/
+    expire_in: 1 week
+```
+
+### Multiple Browsers
+
+```yaml
+stages:
+  - test
+
+.test-template:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.40.0-focal
+  script:
+    - npm ci
+    - npx playwright test --project=$BROWSER
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+    expire_in: 1 week
+
+test-chromium:
+  extends: .test-template
+  variables:
+    BROWSER: chromium
+
+test-firefox:
+  extends: .test-template
+  variables:
+    BROWSER: firefox
+
+test-webkit:
+  extends: .test-template
+  variables:
+    BROWSER: webkit
+```
+
+## Jenkins
+
+### Jenkinsfile Configuration
+
+```groovy
+pipeline {
+  agent {
+    docker {
+      image 'mcr.microsoft.com/playwright:v1.40.0-focal'
+    }
+  }
+  
+  stages {
+    stage('Install Dependencies') {
+      steps {
+        sh 'npm ci'
+      }
+    }
+    
+    stage('Run Tests') {
+      steps {
+        sh 'npx playwright test'
+      }
+    }
+  }
+  
+  post {
+    always {
+      archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
+      publishHTML([
+        reportDir: 'playwright-report',
+        reportFiles: 'index.html',
+        reportName: 'Playwright Test Report'
+      ])
+    }
+  }
+}
+```
+
+## CircleCI
+
+### Configuration
+
+Create `.circleci/config.yml`:
+
+```yaml
+version: 2.1
+
+orbs:
+  node: circleci/node@5.0.0
+
+jobs:
+  playwright-tests:
+    docker:
+      - image: mcr.microsoft.com/playwright:v1.40.0-focal
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+      - run:
+          name: Run Playwright tests
+          command: npx playwright test
+      - store_artifacts:
+          path: playwright-report
+      - store_test_results:
+          path: test-results
+
+workflows:
+  test:
+    jobs:
+      - playwright-tests
+```
+
+## Docker
+
+### Using Playwright Docker Image
+
+```dockerfile
+FROM mcr.microsoft.com/playwright:v1.40.0-focal
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+CMD ["npx", "playwright", "test"]
+```
+
+Build and run:
+
+```bash
+docker build -t playwright-tests .
+docker run -it playwright-tests
+```
+
+### Docker Compose
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.40.0-focal
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: npm run test:ci
+    environment:
+      - CI=true
+```
+
+Run tests:
+
+```bash
+docker-compose run playwright
+```
+
+## Best Practices
+
+### Optimize CI Configuration
+
+<Steps>
+  <Step title="Cache dependencies">
+    ```yaml
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    ```
+  </Step>
+
+  <Step title="Cache Playwright browsers">
+    ```yaml
+    - name: Cache Playwright browsers
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+    ```
+  </Step>
+
+  <Step title="Use fail-fast: false">
+    ```yaml
+    strategy:
+      fail-fast: false  # Continue other jobs even if one fails
+      matrix:
+        browser: [chromium, firefox, webkit]
+    ```
+  </Step>
+
+  <Step title="Set appropriate timeouts">
+    ```yaml
+    jobs:
+      test:
+        timeout-minutes: 60  # Prevent hanging jobs
+    ```
+  </Step>
+</Steps>
+
+### CI-Specific Configuration
+
+Create `playwright.ci.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  
+  // CI-specific settings
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  
+  reporter: [
+    ['html'],
+    ['junit', { outputFile: 'test-results/junit.xml' }],
+    ['json', { outputFile: 'test-results/results.json' }],
+  ],
+  
+  use: {
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+});
+```
+
+Run in CI:
+
+```bash
+npx playwright test --config=playwright.ci.config.ts
+```
+
+## Environment Variables
+
+### Set Secrets
+
+<CodeGroup>
+```yaml GitHub Actions
+env:
+  API_TOKEN: ${{ secrets.API_TOKEN }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+```
+
+```yaml GitLab CI
+variables:
+  API_TOKEN: $API_TOKEN
+  DATABASE_URL: $DATABASE_URL
+```
+</CodeGroup>
+
+### Use in Tests
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({
+  extraHTTPHeaders: {
+    'Authorization': `Bearer ${process.env.API_TOKEN}`,
+  },
+});
+
+test('authenticated request', async ({ request }) => {
+  const response = await request.get('/api/profile');
+  expect(response.ok()).toBeTruthy();
+});
+```
+
+## Reporting
+
+### HTML Report
+
+Automatically generated after test runs:
+
+```yaml
+- name: Upload HTML report
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: playwright-report
+    path: playwright-report/
+```
+
+### JUnit Report
+
+For CI integration:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  reporter: [
+    ['junit', { outputFile: 'results.xml' }],
+  ],
+});
+```
+
+### Slack Notifications
+
+```yaml
+- name: Notify Slack
+  if: failure()
+  uses: slackapi/slack-github-action@v1
+  with:
+    payload: |
+      {
+        "text": "Playwright tests failed on ${{ github.ref }}"
+      }
+  env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+## Real-World Example from Playwright Repo
+
+From `.github/workflows/tests_primary.yml`:
+
+```yaml
+name: "tests 1"
+
+on:
+  push:
+    branches:
+      - main
+      - release-*
+  pull_request:
+    branches:
+      - main
+      - release-*
+
+env:
+  FORCE_COLOR: 1
+  ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+jobs:
+  test_linux:
+    name: ${{ matrix.os }} (${{ matrix.browser }} - Node.js ${{ matrix.node-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        os: [ubuntu-22.04]
+        node-version: [20]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps
+      - run: npm run test -- --project=${{ matrix.browser }}-*
+```
+
+## Troubleshooting
+
+<Warning>
+  Always install browsers with `--with-deps` flag in CI to ensure all system dependencies are installed.
+</Warning>
+
+### Tests timing out in CI
+
+Increase timeout in configuration:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  timeout: 60000, // 60 seconds per test
+  expect: {
+    timeout: 10000, // 10 seconds for assertions
+  },
+});
+```
+
+### Browser installation fails
+
+Use the official Playwright Docker image:
+
+```yaml
+container:
+  image: mcr.microsoft.com/playwright:v1.40.0-focal
+```
+
+### Flaky tests in CI
+
+Enable retries:
+
+```typescript
+export default defineConfig({
+  retries: process.env.CI ? 2 : 0,
+});
+```
+
+<Tip>
+  **Use Playwright Docker images**: Official images include all dependencies and are optimized for CI environments.
+</Tip>
+
+## Performance Tips
+
+- **Use sharding**: Split tests across multiple machines for faster execution
+- **Cache dependencies**: Cache npm packages and Playwright browsers
+- **Run tests in parallel**: Use multiple workers
+- **Use headed: false**: Headless mode is faster
+- **Minimize retries**: Only retry flaky tests in CI
+- **Upload artifacts conditionally**: Only on failure to save storage
+
+<Note>
+  CI runs typically take longer than local runs. Optimize for reliability over speed.
+</Note>

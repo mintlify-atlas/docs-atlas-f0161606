@@ -1,0 +1,506 @@
+---
+title: 'Test API'
+description: 'Complete API reference for Playwright Test including test(), test.describe(), hooks, and modifiers'
+---
+
+# Test API
+
+The `test` object is the main entry point for defining tests in Playwright. It provides methods for creating test cases, organizing them into suites, and controlling test execution.
+
+## Importing
+
+```typescript
+import { test, expect } from '@playwright/test';
+```
+
+## test()
+
+Defines a test case.
+
+### Signature
+
+```typescript
+test(title: string, testFunction: (args: TestArgs, testInfo: TestInfo) => Promise<void>): void
+test(title: string, details: TestDetails, testFunction: (args: TestArgs, testInfo: TestInfo) => Promise<void>): void
+```
+
+<ParamField path="title" type="string" required>
+  Test title that will be shown in the test report.
+</ParamField>
+
+<ParamField path="details" type="TestDetails">
+  Optional test details object:
+  
+  ```typescript
+  interface TestDetails {
+    tag?: string | string[];           // Tags for filtering tests
+    annotation?: TestAnnotation[];     // Annotations like { type, description }
+  }
+  ```
+</ParamField>
+
+<ParamField path="testFunction" type="Function" required>
+  Async function containing the test code. Receives fixture arguments and testInfo.
+</ParamField>
+
+### Example
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('basic test', async ({ page }) => {
+  await page.goto('https://playwright.dev');
+  await expect(page).toHaveTitle(/Playwright/);
+});
+
+// Test with tags
+test('login test', { tag: '@smoke' }, async ({ page }) => {
+  await page.goto('/login');
+});
+
+// Test with annotations
+test('experimental feature', {
+  annotation: { type: 'issue', description: 'https://github.com/example/issue/123' }
+}, async ({ page }) => {
+  // test code
+});
+```
+
+## test.describe()
+
+Groups tests into a suite. Test suites can be nested.
+
+### Signature
+
+```typescript
+test.describe(title: string, callback: () => void): void
+test.describe(title: string, details: TestDetails, callback: () => void): void
+test.describe(callback: () => void): void  // Anonymous suite
+```
+
+<ParamField path="title" type="string">
+  Suite title. Optional for anonymous suites.
+</ParamField>
+
+<ParamField path="details" type="TestDetails">
+  Optional suite details (tags, annotations).
+</ParamField>
+
+<ParamField path="callback" type="Function" required>
+  Function that contains test definitions and other suite configuration.
+</ParamField>
+
+### Example
+
+```typescript
+test.describe('navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/app');
+  });
+
+  test('can navigate to home', async ({ page }) => {
+    await page.click('text=Home');
+  });
+
+  test('can navigate to settings', async ({ page }) => {
+    await page.click('text=Settings');
+  });
+});
+
+// Tagged suite
+test.describe('admin features', { tag: '@admin' }, () => {
+  test('admin dashboard', async ({ page }) => {
+    // test code
+  });
+});
+```
+
+### test.describe.configure()
+
+Configure suite execution mode, timeout, and retries.
+
+```typescript
+test.describe.configure({ mode?: 'default' | 'parallel' | 'serial', timeout?: number, retries?: number }): void
+```
+
+**Example:**
+
+```typescript
+test.describe('parallel suite', () => {
+  test.describe.configure({ mode: 'parallel' });
+  
+  test('test 1', async ({ page }) => { /* ... */ });
+  test('test 2', async ({ page }) => { /* ... */ });
+});
+
+test.describe('serial suite', () => {
+  test.describe.configure({ mode: 'serial' });
+  
+  test('runs first', async ({ page }) => { /* ... */ });
+  test('runs second', async ({ page }) => { /* ... */ });
+});
+```
+
+### test.describe.only()
+
+Run only this suite and skip all other tests.
+
+```typescript
+test.describe.only('focused suite', () => {
+  // only tests in this suite will run
+});
+```
+
+### test.describe.skip()
+
+Skip all tests in this suite.
+
+```typescript
+test.describe.skip('skipped suite', () => {
+  // these tests will be skipped
+});
+```
+
+### test.describe.fixme()
+
+Mark all tests in this suite as "fixme" (known to be broken).
+
+```typescript
+test.describe.fixme('broken suite', () => {
+  // these tests are known to be broken
+});
+```
+
+### test.describe.parallel()
+
+Run tests in this suite in parallel.
+
+```typescript
+test.describe.parallel('parallel suite', () => {
+  test('test 1', async ({ page }) => { /* ... */ });
+  test('test 2', async ({ page }) => { /* ... */ });
+});
+```
+
+### test.describe.serial()
+
+Run tests in this suite serially (one after another).
+
+```typescript
+test.describe.serial('serial suite', () => {
+  test('runs first', async ({ page }) => { /* ... */ });
+  test('runs second', async ({ page }) => { /* ... */ });
+});
+```
+
+## Hooks
+
+Hooks allow you to run setup and teardown code before and after tests.
+
+### test.beforeEach()
+
+Runs before each test in the suite.
+
+```typescript
+test.beforeEach(async ({ page }) => {
+  await page.goto('/app');
+});
+
+test.beforeEach('setup user', async ({ page }) => {
+  // Named hook
+  await page.evaluate(() => localStorage.setItem('user', 'testuser'));
+});
+```
+
+### test.afterEach()
+
+Runs after each test in the suite.
+
+```typescript
+test.afterEach(async ({ page }) => {
+  await page.screenshot({ path: 'test-result.png' });
+});
+```
+
+### test.beforeAll()
+
+Runs once before all tests in the suite.
+
+```typescript
+test.beforeAll(async ({ browser }) => {
+  // Setup code that runs once
+  // Note: only worker fixtures are available
+});
+```
+
+### test.afterAll()
+
+Runs once after all tests in the suite.
+
+```typescript
+test.afterAll(async ({ browser }) => {
+  // Cleanup code that runs once
+});
+```
+
+## Test Modifiers
+
+### test.only()
+
+Run only this test and skip all others.
+
+```typescript
+test.only('focused test', async ({ page }) => {
+  // only this test will run
+});
+```
+
+### test.skip()
+
+Skip a test or conditionally skip.
+
+```typescript
+// Skip unconditionally
+test.skip('skipped test', async ({ page }) => {
+  // this test will be skipped
+});
+
+// Skip conditionally
+test.skip(({ browserName }) => browserName === 'webkit', 'Not supported on WebKit');
+
+test('conditional skip', async ({ page }) => {
+  test.skip(process.platform === 'win32', 'Windows only test');
+  // test code
+});
+```
+
+### test.fixme()
+
+Mark a test as "fixme" (known to be broken).
+
+```typescript
+test.fixme('broken test', async ({ page }) => {
+  // this test is known to be broken
+});
+
+// Conditional fixme
+test('test', async ({ page }) => {
+  test.fixme(({ browserName }) => browserName === 'firefox', 'Firefox bug');
+  // test code
+});
+```
+
+### test.fail()
+
+Mark a test as expected to fail. The test will pass if it fails and fail if it passes.
+
+```typescript
+test('known failure', async ({ page }) => {
+  test.fail();
+  // test code that is expected to fail
+});
+
+// Conditional fail
+test('test', async ({ page }) => {
+  test.fail(({ browserName }) => browserName === 'webkit', 'Known WebKit issue');
+  // test code
+});
+```
+
+### test.slow()
+
+Mark a test as slow, tripling its timeout.
+
+```typescript
+test('slow test', async ({ page }) => {
+  test.slow();
+  // test code that takes a long time
+});
+
+// Conditional slow
+test('test', async ({ page }) => {
+  test.slow(({ platform }) => platform === 'darwin', 'Slow on macOS');
+  // test code
+});
+```
+
+## Advanced Features
+
+### test.step()
+
+Create a custom test step for better reporting.
+
+```typescript
+await test.step(title: string, body: (step: TestStepInfo) => Promise<T>): Promise<T>
+await test.step(title: string, body: (step: TestStepInfo) => Promise<T>, options: { timeout?: number }): Promise<T>
+```
+
+**Example:**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('user flow', async ({ page }) => {
+  await test.step('login', async () => {
+    await page.goto('/login');
+    await page.fill('#username', 'user');
+    await page.fill('#password', 'pass');
+    await page.click('button[type=submit]');
+  });
+
+  await test.step('verify dashboard', async () => {
+    await expect(page).toHaveURL('/dashboard');
+    await expect(page.locator('h1')).toContainText('Dashboard');
+  });
+
+  await test.step('logout', async () => {
+    await page.click('text=Logout');
+  });
+});
+```
+
+### test.use()
+
+Override fixture values for all tests in a file.
+
+```typescript
+test.use(fixtures: Fixtures): void
+```
+
+**Example:**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+// All tests in this file will use mobile viewport
+test.use({ viewport: { width: 375, height: 667 } });
+
+test('mobile test', async ({ page }) => {
+  // page will use mobile viewport
+});
+```
+
+### test.extend()
+
+Extend test with custom fixtures.
+
+```typescript
+test.extend<TestFixtures, WorkerFixtures>(fixtures: Fixtures): TestType
+```
+
+**Example:**
+
+```typescript
+import { test as base } from '@playwright/test';
+
+type MyFixtures = {
+  todoPage: TodoPage;
+};
+
+const test = base.extend<MyFixtures>({
+  todoPage: async ({ page }, use) => {
+    const todoPage = new TodoPage(page);
+    await todoPage.goto();
+    await use(todoPage);
+  },
+});
+
+test('add todo', async ({ todoPage }) => {
+  await todoPage.addTodo('Buy milk');
+});
+```
+
+### test.info()
+
+Get information about the currently running test.
+
+```typescript
+test.info(): TestInfo
+```
+
+**Example:**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('test with info', async ({ page }) => {
+  const testInfo = test.info();
+  console.log(testInfo.title);  // 'test with info'
+  console.log(testInfo.retry);  // 0, 1, 2... for retries
+  
+  // Attach a file
+  await testInfo.attach('screenshot', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+});
+```
+
+### test.setTimeout()
+
+Set timeout for a test or suite.
+
+```typescript
+test.setTimeout(timeout: number): void
+```
+
+**Example:**
+
+```typescript
+test('long test', async ({ page }) => {
+  test.setTimeout(60000);  // 60 seconds
+  // long running test
+});
+
+test.describe('suite', () => {
+  test.setTimeout(30000);  // applies to all tests in suite
+  
+  test('test 1', async ({ page }) => { /* ... */ });
+  test('test 2', async ({ page }) => { /* ... */ });
+});
+```
+
+## TypeScript Definitions
+
+```typescript
+interface TestType<TestArgs, WorkerArgs> {
+  (title: string, testFunction: (args: TestArgs, testInfo: TestInfo) => Promise<void>): void;
+  (title: string, details: TestDetails, testFunction: (args: TestArgs, testInfo: TestInfo) => Promise<void>): void;
+  
+  only: TestType<TestArgs, WorkerArgs>;
+  skip: TestType<TestArgs, WorkerArgs> & ModifierFunction;
+  fixme: TestType<TestArgs, WorkerArgs> & ModifierFunction;
+  fail: TestType<TestArgs, WorkerArgs> & ModifierFunction;
+  slow: ModifierFunction;
+  
+  describe: DescribeFunction;
+  beforeEach: HookFunction;
+  afterEach: HookFunction;
+  beforeAll: HookFunction;
+  afterAll: HookFunction;
+  
+  step: <T>(title: string, body: () => Promise<T>, options?: { timeout?: number }) => Promise<T>;
+  use: (fixtures: Partial<TestArgs & WorkerArgs>) => void;
+  extend: <T, W>(fixtures: Fixtures<T, W>) => TestType<TestArgs & T, WorkerArgs & W>;
+  info: () => TestInfo;
+  setTimeout: (timeout: number) => void;
+  
+  expect: ExpectType;
+}
+
+interface TestDetails {
+  tag?: string | string[];
+  annotation?: TestAnnotation | TestAnnotation[];
+}
+
+interface TestAnnotation {
+  type: string;
+  description?: string;
+}
+```
+
+## See Also
+
+- [Test Fixtures](/api/test-fixtures) - Built-in fixtures reference
+- [Test Configuration](/api/test-config) - Configuration options
+- [TestInfo API](/api/test-info) - Test information and utilities

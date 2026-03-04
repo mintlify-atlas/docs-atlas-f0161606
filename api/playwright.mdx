@@ -1,0 +1,108 @@
+---
+title: Playwright
+description: API reference for the Playwright class - the main entry point for Playwright automation
+---
+
+Playwright is the main entry point for all browser automation. It provides access to browser types (Chromium, Firefox, WebKit), devices, and utilities.
+
+## Inheritance
+
+Extends: `ChannelOwner`
+
+## Properties
+
+### chromium
+
+<ParamField path="chromium" type="BrowserType">
+  BrowserType instance for launching or connecting to Chromium browsers.
+</ParamField>
+
+### firefox
+
+<ParamField path="firefox" type="BrowserType">
+  BrowserType instance for launching or connecting to Firefox browsers.
+</ParamField>
+
+### webkit
+
+<ParamField path="webkit" type="BrowserType">
+  BrowserType instance for launching or connecting to WebKit browsers.
+</ParamField>
+
+### devices
+
+<ParamField path="devices" type="object">
+  Registry of device descriptors for mobile emulation. Contains pre-configured settings for popular devices.
+</ParamField>
+
+### selectors
+
+<ParamField path="selectors" type="Selectors">
+  Selectors engine instance for customizing element selection behavior.
+</ParamField>
+
+### request
+
+<ParamField path="request" type="APIRequest">
+  API request context for making HTTP requests outside of a browser context.
+</ParamField>
+
+### errors
+
+<ParamField path="errors" type="object">
+  Object containing Playwright-specific error classes.
+  
+  - `TimeoutError`: Thrown when operations exceed their timeout
+</ParamField>
+
+## Usage Examples
+
+### Basic Browser Launch
+
+```typescript
+import { chromium, firefox, webkit } from 'playwright';
+
+// Launch Chromium
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('https://example.com');
+
+// Launch Firefox
+const firefoxBrowser = await firefox.launch({ headless: false });
+
+// Launch WebKit
+const webkitBrowser = await webkit.launch();
+```
+
+### Using Device Emulation
+
+```typescript
+import { chromium, devices } from 'playwright';
+
+const browser = await chromium.launch();
+const iPhoneDevice = devices['iPhone 13'];
+const context = await browser.newContext({
+  ...iPhoneDevice,
+});
+const page = await context.newPage();
+```
+
+### Making API Requests
+
+```typescript
+import { request } from 'playwright';
+
+const apiContext = await request.newContext({
+  baseURL: 'https://api.example.com',
+});
+
+const response = await apiContext.get('/endpoint');
+const data = await response.json();
+```
+
+## Related Classes
+
+- [BrowserType](/api/browser-type) - For launching browsers
+- [Browser](/api/browser) - For managing browser instances
+- [BrowserContext](/api/browser-context) - For isolated browser sessions
+- [Page](/api/page) - For interacting with web pages

@@ -1,0 +1,264 @@
+---
+title: Video
+description: API reference for Playwright Video class for recording test videos
+---
+
+The Video class enables recording videos of browser sessions during test execution. Videos are useful for debugging test failures and understanding user interactions.
+
+## Overview
+
+Access video through the page object:
+
+```typescript
+const video = page.video();
+```
+
+## Methods
+
+### start
+
+Starts video recording.
+
+```typescript
+await video.start();
+await video.start({ size: { width: 1280, height: 720 } });
+```
+
+<ParamField path="options.size" type="{ width: number, height: number }">
+  Video frame size. If not specified, uses the viewport size.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### stop
+
+Stops video recording and optionally saves it to a file.
+
+```typescript
+await video.stop();
+await video.stop({ path: 'videos/test.webm' });
+```
+
+<ParamField path="options.path" type="string">
+  Path to save the video file. If not specified, the video is saved to the test output directory.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### path
+
+Returns the path to the video file.
+
+```typescript
+const videoPath = await video.path();
+console.log(`Video saved at: ${videoPath}`);
+```
+
+**Returns:** `Promise<string>`
+
+**Note:** This method throws an error when connecting remotely. Use `saveAs()` to save a local copy instead.
+
+### saveAs
+
+Saves the video to the specified path.
+
+```typescript
+await video.saveAs('videos/my-test.webm');
+```
+
+<ParamField path="path" type="string" required>
+  Path where the video should be saved.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### delete
+
+Deletes the video file.
+
+```typescript
+await video.delete();
+```
+
+**Returns:** `Promise<void>`
+
+## Examples
+
+### Recording a video
+
+```typescript
+import { test } from '@playwright/test';
+
+test('record video', async ({ page }) => {
+  const video = page.video();
+  
+  if (video) {
+    await page.goto('https://example.com');
+    await page.click('#button');
+    
+    // Video is automatically saved when the test ends
+    const path = await video.path();
+    console.log(`Video saved at: ${path}`);
+  }
+});
+```
+
+### Custom video size
+
+```typescript
+test('custom video size', async ({ page }) => {
+  const video = page.video();
+  
+  if (video) {
+    await video.start({ size: { width: 1920, height: 1080 } });
+    
+    await page.goto('https://example.com');
+    await page.click('#button');
+    
+    await video.stop({ path: 'videos/hd-test.webm' });
+  }
+});
+```
+
+### Saving video to custom location
+
+```typescript
+test('save video', async ({ page }) => {
+  const video = page.video();
+  
+  if (video) {
+    await page.goto('https://example.com');
+    await page.click('#button');
+    
+    await video.saveAs('custom-videos/test-recording.webm');
+  }
+});
+```
+
+### Conditional video recording
+
+```typescript
+import { test as base } from '@playwright/test';
+
+const test = base.extend({
+  page: async ({ page }, use, testInfo) => {
+    await use(page);
+    
+    const video = page.video();
+    if (video) {
+      // Save video only on failure
+      if (testInfo.status !== testInfo.expectedStatus) {
+        const videoPath = `videos/failed-${testInfo.title}.webm`;
+        await video.saveAs(videoPath);
+      } else {
+        // Delete video if test passed
+        await video.delete();
+      }
+    }
+  },
+});
+
+test('example test', async ({ page }) => {
+  await page.goto('https://example.com');
+  // Video is saved only if test fails
+});
+```
+
+### Remote connection video
+
+```typescript
+test('remote video', async ({ page }) => {
+  const video = page.video();
+  
+  if (video) {
+    await page.goto('https://example.com');
+    await page.click('#button');
+    
+    // Use saveAs for remote connections
+    await video.saveAs('videos/remote-test.webm');
+  }
+});
+```
+
+### Video with manual start/stop
+
+```typescript
+test('manual video control', async ({ page }) => {
+  const video = page.video();
+  
+  if (video) {
+    // Navigate without recording
+    await page.goto('https://example.com');
+    
+    // Start recording before important actions
+    await video.start();
+    await page.click('#important-button');
+    await page.fill('#form-field', 'data');
+    
+    // Stop recording
+    await video.stop({ path: 'videos/important-actions.webm' });
+  }
+});
+```
+
+## Configuration
+
+Configure video recording in `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    video: 'on', // 'on', 'off', 'retain-on-failure', 'on-first-retry'
+    videoSize: { width: 1280, height: 720 },
+  },
+});
+```
+
+Options:
+- `'on'`: Record video for each test
+- `'off'`: Do not record video
+- `'retain-on-failure'`: Record video for each test, but remove it if test passes
+- `'on-first-retry'`: Record video only when retrying a test for the first time
+
+### Per-project configuration
+
+```typescript
+export default defineConfig({
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        video: 'on-first-retry',
+      },
+    },
+    {
+      name: 'mobile',
+      use: {
+        ...devices['iPhone 13'],
+        video: 'retain-on-failure',
+        videoSize: { width: 390, height: 844 },
+      },
+    },
+  ],
+});
+```
+
+## Video Format
+
+Playwright records videos in WebM format with VP9 codec. Videos include:
+- Browser viewport rendering
+- Mouse movements and clicks
+- Keyboard input
+- Page navigations
+- Console messages (in separate trace files)
+
+## Storage Considerations
+
+Video files can be large. Best practices:
+- Use `'retain-on-failure'` or `'on-first-retry'` modes
+- Delete videos in CI/CD after test completion
+- Use lower resolution for faster recording: `{ width: 800, height: 600 }`
+- Consider using traces instead of videos for detailed debugging

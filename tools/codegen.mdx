@@ -1,0 +1,235 @@
+---
+title: 'Code Generator'
+description: 'Generate Playwright test scripts by recording browser interactions'
+---
+
+## Overview
+
+Playwright's Code Generator (codegen) is an interactive tool that records your browser interactions and generates test code automatically. It's the fastest way to create end-to-end tests by simply using your application as you normally would.
+
+## Starting Codegen
+
+### Basic Usage
+
+```bash
+npx playwright codegen
+```
+
+This opens a browser window and the Playwright Inspector. All your actions in the browser will be recorded and converted to test code.
+
+### With a URL
+
+```bash
+npx playwright codegen https://example.com
+```
+
+Start recording with a specific URL already loaded.
+
+## Command Options
+
+### Browser Selection
+
+```bash
+npx playwright codegen -b webkit https://example.com
+npx playwright codegen --browser=firefox
+```
+
+Supported browsers:
+- `chromium` (default)
+- `firefox` or `ff`
+- `webkit` or `wk`
+- `cr` (alias for chromium)
+
+### Target Language
+
+```bash
+npx playwright codegen --target=python
+npx playwright codegen --target=java
+```
+
+Generate code in different languages and test frameworks:
+
+<AccordionGroup>
+  <Accordion title="JavaScript/TypeScript">
+    - `javascript` - Plain JavaScript with Playwright Library
+    - `playwright-test` - Playwright Test framework (default)
+  </Accordion>
+  
+  <Accordion title="Python">
+    - `python` - Synchronous Python API
+    - `python-async` - Async Python API
+    - `python-pytest` - Pytest with Playwright fixtures
+  </Accordion>
+  
+  <Accordion title="Java">
+    - `java` - Java with Playwright
+    - `java-junit` - JUnit with Playwright
+  </Accordion>
+  
+  <Accordion title="C#">
+    - `csharp` - C# with Playwright
+    - `csharp-mstest` - MSTest with Playwright
+    - `csharp-nunit` - NUnit with Playwright
+  </Accordion>
+</AccordionGroup>
+
+### Output to File
+
+```bash
+npx playwright codegen -o tests/example.spec.ts
+npx playwright codegen --output=tests/login.spec.ts https://example.com
+```
+
+Automatically save the generated code to a file instead of displaying it in the inspector.
+
+### Test ID Attribute
+
+```bash
+npx playwright codegen --test-id-attribute=data-testid
+```
+
+When set, codegen will prioritize selectors using the specified attribute. This generates more maintainable tests that are resilient to DOM structure changes.
+
+## Browser Context Options
+
+Codegen supports all standard browser context options to emulate different environments:
+
+### Device Emulation
+
+```bash
+npx playwright codegen --device="iPhone 13"
+```
+
+### Custom Viewport
+
+```bash
+npx playwright codegen --viewport-size=1280,720
+```
+
+### Color Scheme
+
+```bash
+npx playwright codegen --color-scheme=dark
+```
+
+### Geolocation
+
+```bash
+npx playwright codegen --geolocation="37.819722,-122.478611" --lang=en-US
+```
+
+### Timezone
+
+```bash
+npx playwright codegen --timezone="Europe/Rome"
+```
+
+### User Agent
+
+```bash
+npx playwright codegen --user-agent="Custom User Agent String"
+```
+
+## Authentication and Storage
+
+### Saving Storage State
+
+```bash
+npx playwright codegen --save-storage=auth.json
+```
+
+Perform authentication steps during recording, then save cookies and localStorage to a file. This state can be reused in tests.
+
+### Loading Storage State
+
+```bash
+npx playwright codegen --load-storage=auth.json
+```
+
+Start with previously saved authentication state to record authenticated flows without repeating login.
+
+## Network and Proxy
+
+### Proxy Server
+
+```bash
+npx playwright codegen --proxy-server=http://myproxy:3128
+```
+
+### Ignore HTTPS Errors
+
+```bash
+npx playwright codegen --ignore-https-errors
+```
+
+### Save HAR
+
+```bash
+npx playwright codegen --save-har=network.har
+npx playwright codegen --save-har=api.har --save-har-glob="**/api/**"
+```
+
+Record all network activity during the session. Use glob patterns to filter specific requests.
+
+## How Codegen Works
+
+Based on the implementation in `/home/daytona/workspace/source/packages/playwright-core/src/cli/program.ts:563`, codegen:
+
+1. **Launches a browser** with specified options (headless or headed mode)
+2. **Enables the recorder** through `context._enableRecorder()` which activates the recording mode
+3. **Creates a trace directory** for temporary trace storage
+4. **Opens the Playwright Inspector** to display generated code
+5. **Monitors DOM interactions** and converts them into test code
+6. **Generates selectors** using a priority system:
+   - Test ID attributes (if configured)
+   - Role-based selectors
+   - Text content
+   - CSS selectors
+
+<Note>
+Codegen uses the same recorder engine that powers the Playwright Inspector, ensuring generated code matches best practices.
+</Note>
+
+## Tips for Better Code Generation
+
+<CardGroup cols={2}>
+  <Card title="Use Test IDs" icon="fingerprint">
+    Add `data-testid` attributes to your application and use `--test-id-attribute` for stable selectors.
+  </Card>
+  
+  <Card title="Slow Down" icon="gauge-simple-low">
+    Don't rush through actions. Give the page time to load and codegen time to record.
+  </Card>
+  
+  <Card title="Clean Up" icon="broom">
+    Review and refactor generated code. Extract reusable functions and add assertions.
+  </Card>
+  
+  <Card title="Save State" icon="floppy-disk">
+    Use `--save-storage` to capture authentication and reuse it across tests.
+  </Card>
+</CardGroup>
+
+## Example Workflow
+
+```bash
+# 1. Record authentication flow
+npx playwright codegen --save-storage=auth.json https://app.example.com
+
+# 2. Record feature test with authentication
+npx playwright codegen --load-storage=auth.json \
+  --target=playwright-test \
+  --output=tests/feature.spec.ts \
+  https://app.example.com/feature
+
+# 3. Record in mobile viewport
+npx playwright codegen --device="iPhone 13" \
+  --load-storage=auth.json \
+  https://app.example.com
+```
+
+## See Also
+
+- [Inspector](/tools/inspector) - Debug and step through tests
+- [Trace Viewer](/tools/trace-viewer) - Analyze test execution traces
+- [UI Mode](/tools/ui-mode) - Interactive test development environment

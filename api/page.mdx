@@ -1,0 +1,998 @@
+---
+title: Page
+description: API reference for the Page class - interact with web pages
+---
+
+Page provides methods to interact with a single tab in a browser. Each page has a main frame and can have child frames.
+
+## Inheritance
+
+Extends: `ChannelOwner`
+
+Implements: `EventEmitter`
+
+## Events
+
+- `load`: Emitted when the load event is fired
+- `domcontentloaded`: Emitted when DOMContentLoaded event is fired
+- `close`: Emitted when page is closed
+- `crash`: Emitted when page crashes
+- `console`: Emitted when console message is logged
+- `dialog`: Emitted when a dialog appears
+- `download`: Emitted when download starts
+- `filechooser`: Emitted when file chooser opens
+- `frameattached`: Emitted when frame is attached
+- `framedetached`: Emitted when frame is detached
+- `framenavigated`: Emitted when frame navigates
+- `pageerror`: Emitted when uncaught exception occurs
+- `popup`: Emitted when popup is opened
+- `request`: Emitted when request is made
+- `response`: Emitted when response is received
+- `requestfailed`: Emitted when request fails
+- `requestfinished`: Emitted when request finishes
+- `websocket`: Emitted when WebSocket is created
+- `worker`: Emitted when worker is created
+
+## Properties
+
+### keyboard
+
+<ParamField path="keyboard" type="Keyboard">
+  Keyboard input instance.
+</ParamField>
+
+### mouse
+
+<ParamField path="mouse" type="Mouse">
+  Mouse input instance.
+</ParamField>
+
+### touchscreen
+
+<ParamField path="touchscreen" type="Touchscreen">
+  Touchscreen input instance.
+</ParamField>
+
+### request
+
+<ParamField path="request" type="APIRequestContext">
+  API request context.
+</ParamField>
+
+### clock
+
+<ParamField path="clock" type="Clock">
+  Clock instance for time control.
+</ParamField>
+
+### coverage
+
+<ParamField path="coverage" type="Coverage">
+  Coverage instance (Chromium only).
+</ParamField>
+
+## Navigation Methods
+
+### goto
+
+Navigates to a URL.
+
+```typescript
+goto(url: string, options?: GotoOptions): Promise<Response | null>
+```
+
+<ParamField path="url" type="string" required>
+  URL to navigate to
+</ParamField>
+
+<ParamField path="options" type="GotoOptions" optional>
+  Navigation options
+  
+  - `timeout` (number): Maximum time in milliseconds
+  - `waitUntil` ('load' | 'domcontentloaded' | 'networkidle' | 'commit'): When to consider navigation succeeded
+  - `referer` (string): Referer header value
+</ParamField>
+
+**Returns:** `Promise<Response | null>` - Main resource response
+
+### reload
+
+Reloads the page.
+
+```typescript
+reload(options?: ReloadOptions): Promise<Response | null>
+```
+
+<ParamField path="options" type="ReloadOptions" optional>
+  Reload options (same as goto)
+</ParamField>
+
+**Returns:** `Promise<Response | null>` - Main resource response
+
+### goBack
+
+Navigates to the previous page in history.
+
+```typescript
+goBack(options?: NavigationOptions): Promise<Response | null>
+```
+
+<ParamField path="options" type="NavigationOptions" optional>
+  Navigation options
+</ParamField>
+
+**Returns:** `Promise<Response | null>` - Main resource response
+
+### goForward
+
+Navigates to the next page in history.
+
+```typescript
+goForward(options?: NavigationOptions): Promise<Response | null>
+```
+
+<ParamField path="options" type="NavigationOptions" optional>
+  Navigation options
+</ParamField>
+
+**Returns:** `Promise<Response | null>` - Main resource response
+
+### waitForNavigation
+
+Waits for navigation to finish.
+
+```typescript
+waitForNavigation(options?: WaitForNavigationOptions): Promise<Response | null>
+```
+
+<ParamField path="options" type="WaitForNavigationOptions" optional>
+  Wait options
+  
+  - `url` (string | RegExp): URL pattern to wait for
+  - `waitUntil` (string): When to consider navigation succeeded
+  - `timeout` (number): Maximum wait time
+</ParamField>
+
+**Returns:** `Promise<Response | null>` - Response
+
+### waitForLoadState
+
+Waits for load state to be reached.
+
+```typescript
+waitForLoadState(state?: 'load' | 'domcontentloaded' | 'networkidle', options?: TimeoutOptions): Promise<void>
+```
+
+<ParamField path="state" type="string" optional>
+  Load state to wait for (default: 'load')
+</ParamField>
+
+<ParamField path="options" type="TimeoutOptions" optional>
+  Timeout options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### waitForURL
+
+Waits for page to navigate to matching URL.
+
+```typescript
+waitForURL(url: string | RegExp, options?: WaitForURLOptions): Promise<void>
+```
+
+<ParamField path="url" type="string | RegExp" required>
+  URL pattern to wait for
+</ParamField>
+
+<ParamField path="options" type="WaitForURLOptions" optional>
+  Wait options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+## Selector Methods
+
+### $
+
+Finds an element matching the selector.
+
+```typescript
+$(selector: string, options?: { strict?: boolean }): Promise<ElementHandle | null>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to query
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `strict` (boolean): Throw if multiple elements match
+</ParamField>
+
+**Returns:** `Promise<ElementHandle | null>` - Element handle or null
+
+### $$
+
+Finds all elements matching the selector.
+
+```typescript
+$$(selector: string): Promise<ElementHandle[]>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to query
+</ParamField>
+
+**Returns:** `Promise<ElementHandle[]>` - Array of element handles
+
+### locator
+
+Creates a locator.
+
+```typescript
+locator(selector: string, options?: LocatorOptions): Locator
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to locate
+</ParamField>
+
+<ParamField path="options" type="LocatorOptions" optional>
+  Locator options
+  
+  - `hasText` (string | RegExp): Matches elements containing text
+  - `hasNotText` (string | RegExp): Matches elements not containing text
+  - `has` (Locator): Matches elements containing another locator
+  - `hasNot` (Locator): Matches elements not containing another locator
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+### getByRole
+
+Creates a locator by ARIA role.
+
+```typescript
+getByRole(role: string, options?: ByRoleOptions): Locator
+```
+
+<ParamField path="role" type="string" required>
+  ARIA role
+</ParamField>
+
+<ParamField path="options" type="ByRoleOptions" optional>
+  Role options
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+### getByText
+
+Creates a locator by text content.
+
+```typescript
+getByText(text: string | RegExp, options?: { exact?: boolean }): Locator
+```
+
+<ParamField path="text" type="string | RegExp" required>
+  Text to match
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `exact` (boolean): Exact match
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+### getByLabel
+
+Creates a locator by label text.
+
+```typescript
+getByLabel(text: string | RegExp, options?: { exact?: boolean }): Locator
+```
+
+<ParamField path="text" type="string | RegExp" required>
+  Label text to match
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `exact` (boolean): Exact match
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+### getByPlaceholder
+
+Creates a locator by placeholder text.
+
+```typescript
+getByPlaceholder(text: string | RegExp, options?: { exact?: boolean }): Locator
+```
+
+<ParamField path="text" type="string | RegExp" required>
+  Placeholder text to match
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `exact` (boolean): Exact match
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+### getByAltText
+
+Creates a locator by alt text.
+
+```typescript
+getByAltText(text: string | RegExp, options?: { exact?: boolean }): Locator
+```
+
+<ParamField path="text" type="string | RegExp" required>
+  Alt text to match
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `exact` (boolean): Exact match
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+### getByTitle
+
+Creates a locator by title attribute.
+
+```typescript
+getByTitle(text: string | RegExp, options?: { exact?: boolean }): Locator
+```
+
+<ParamField path="text" type="string | RegExp" required>
+  Title to match
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `exact` (boolean): Exact match
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+### getByTestId
+
+Creates a locator by test ID.
+
+```typescript
+getByTestId(testId: string | RegExp): Locator
+```
+
+<ParamField path="testId" type="string | RegExp" required>
+  Test ID to match
+</ParamField>
+
+**Returns:** `Locator` - Locator instance
+
+## Action Methods
+
+### click
+
+Clicks an element.
+
+```typescript
+click(selector: string, options?: ClickOptions): Promise<void>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to click
+</ParamField>
+
+<ParamField path="options" type="ClickOptions" optional>
+  Click options
+  
+  - `button` ('left' | 'right' | 'middle'): Mouse button
+  - `clickCount` (number): Number of clicks
+  - `delay` (number): Delay between mousedown and mouseup
+  - `position` (object): Click position { x, y }
+  - `modifiers` (string[]): Modifier keys
+  - `force` (boolean): Force click even if element is not actionable
+  - `noWaitAfter` (boolean): Don't wait for navigation
+  - `timeout` (number): Maximum time in milliseconds
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### dblclick
+
+Double clicks an element.
+
+```typescript
+dblclick(selector: string, options?: DblClickOptions): Promise<void>
+```
+
+### fill
+
+Fills an input field.
+
+```typescript
+fill(selector: string, value: string, options?: FillOptions): Promise<void>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to fill
+</ParamField>
+
+<ParamField path="value" type="string" required>
+  Value to fill
+</ParamField>
+
+<ParamField path="options" type="FillOptions" optional>
+  Fill options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### type
+
+Types text into an element.
+
+```typescript
+type(selector: string, text: string, options?: TypeOptions): Promise<void>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to type into
+</ParamField>
+
+<ParamField path="text" type="string" required>
+  Text to type
+</ParamField>
+
+<ParamField path="options" type="TypeOptions" optional>
+  Type options
+  
+  - `delay` (number): Delay between key presses in milliseconds
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### press
+
+Presses a key.
+
+```typescript
+press(selector: string, key: string, options?: PressOptions): Promise<void>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to focus
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  Key to press (e.g., 'Enter', 'ArrowDown')
+</ParamField>
+
+<ParamField path="options" type="PressOptions" optional>
+  Press options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### check
+
+Checks a checkbox.
+
+```typescript
+check(selector: string, options?: CheckOptions): Promise<void>
+```
+
+### uncheck
+
+Unchecks a checkbox.
+
+```typescript
+uncheck(selector: string, options?: CheckOptions): Promise<void>
+```
+
+### selectOption
+
+Selects options in a `<select>` element.
+
+```typescript
+selectOption(selector: string, values: string | string[] | SelectOption | SelectOption[], options?: SelectOptionOptions): Promise<string[]>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to select from
+</ParamField>
+
+<ParamField path="values" type="string | string[] | SelectOption | SelectOption[]" required>
+  Values to select
+</ParamField>
+
+<ParamField path="options" type="SelectOptionOptions" optional>
+  Select options
+</ParamField>
+
+**Returns:** `Promise<string[]>` - Array of selected values
+
+### hover
+
+Hovers over an element.
+
+```typescript
+hover(selector: string, options?: HoverOptions): Promise<void>
+```
+
+### tap
+
+Taps an element (mobile).
+
+```typescript
+tap(selector: string, options?: TapOptions): Promise<void>
+```
+
+### dragAndDrop
+
+Drags and drops an element.
+
+```typescript
+dragAndDrop(source: string, target: string, options?: DragAndDropOptions): Promise<void>
+```
+
+<ParamField path="source" type="string" required>
+  Source element selector
+</ParamField>
+
+<ParamField path="target" type="string" required>
+  Target element selector
+</ParamField>
+
+<ParamField path="options" type="DragAndDropOptions" optional>
+  Drag options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+## Content Methods
+
+### content
+
+Returns page HTML content.
+
+```typescript
+content(): Promise<string>
+```
+
+**Returns:** `Promise<string>` - Full HTML content
+
+### setContent
+
+Sets page HTML content.
+
+```typescript
+setContent(html: string, options?: SetContentOptions): Promise<void>
+```
+
+<ParamField path="html" type="string" required>
+  HTML content to set
+</ParamField>
+
+<ParamField path="options" type="SetContentOptions" optional>
+  Set content options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### title
+
+Returns page title.
+
+```typescript
+title(): Promise<string>
+```
+
+**Returns:** `Promise<string>` - Page title
+
+### url
+
+Returns page URL.
+
+```typescript
+url(): string
+```
+
+**Returns:** `string` - Current URL
+
+### textContent
+
+Returns element's text content.
+
+```typescript
+textContent(selector: string, options?: TimeoutOptions): Promise<string | null>
+```
+
+### innerText
+
+Returns element's inner text.
+
+```typescript
+innerText(selector: string, options?: TimeoutOptions): Promise<string>
+```
+
+### innerHTML
+
+Returns element's inner HTML.
+
+```typescript
+innerHTML(selector: string, options?: TimeoutOptions): Promise<string>
+```
+
+### getAttribute
+
+Returns element's attribute value.
+
+```typescript
+getAttribute(selector: string, name: string, options?: TimeoutOptions): Promise<string | null>
+```
+
+## State Methods
+
+### isVisible
+
+Checks if element is visible.
+
+```typescript
+isVisible(selector: string, options?: TimeoutOptions): Promise<boolean>
+```
+
+### isHidden
+
+Checks if element is hidden.
+
+```typescript
+isHidden(selector: string, options?: TimeoutOptions): Promise<boolean>
+```
+
+### isEnabled
+
+Checks if element is enabled.
+
+```typescript
+isEnabled(selector: string, options?: TimeoutOptions): Promise<boolean>
+```
+
+### isDisabled
+
+Checks if element is disabled.
+
+```typescript
+isDisabled(selector: string, options?: TimeoutOptions): Promise<boolean>
+```
+
+### isChecked
+
+Checks if checkbox is checked.
+
+```typescript
+isChecked(selector: string, options?: TimeoutOptions): Promise<boolean>
+```
+
+### isEditable
+
+Checks if element is editable.
+
+```typescript
+isEditable(selector: string, options?: TimeoutOptions): Promise<boolean>
+```
+
+## Evaluation Methods
+
+### evaluate
+
+Evaluates JavaScript in page context.
+
+```typescript
+evaluate<R, Arg>(pageFunction: Function | string, arg?: Arg): Promise<R>
+```
+
+<ParamField path="pageFunction" type="Function | string" required>
+  Function to evaluate
+</ParamField>
+
+<ParamField path="arg" type="any" optional>
+  Argument to pass to function
+</ParamField>
+
+**Returns:** `Promise<R>` - Evaluation result
+
+### evaluateHandle
+
+Evaluates and returns a JSHandle.
+
+```typescript
+evaluateHandle<R, Arg>(pageFunction: Function | string, arg?: Arg): Promise<JSHandle<R>>
+```
+
+### $eval
+
+Evaluates function on an element.
+
+```typescript
+$eval<R, Arg>(selector: string, pageFunction: Function, arg?: Arg): Promise<R>
+```
+
+### $$eval
+
+Evaluates function on multiple elements.
+
+```typescript
+$$eval<R, Arg>(selector: string, pageFunction: Function, arg?: Arg): Promise<R>
+```
+
+## Frame Methods
+
+### mainFrame
+
+Returns the main frame.
+
+```typescript
+mainFrame(): Frame
+```
+
+**Returns:** `Frame` - Main frame
+
+### frames
+
+Returns all frames.
+
+```typescript
+frames(): Frame[]
+```
+
+**Returns:** `Frame[]` - Array of frames
+
+### frame
+
+Finds a frame by name or URL.
+
+```typescript
+frame(frameSelector: string | { name?: string, url?: string | RegExp }): Frame | null
+```
+
+<ParamField path="frameSelector" type="string | object" required>
+  Frame name or URL pattern
+</ParamField>
+
+**Returns:** `Frame | null` - Matching frame or null
+
+### frameLocator
+
+Creates a frame locator.
+
+```typescript
+frameLocator(selector: string): FrameLocator
+```
+
+<ParamField path="selector" type="string" required>
+  Frame selector
+</ParamField>
+
+**Returns:** `FrameLocator` - Frame locator instance
+
+## Utility Methods
+
+### screenshot
+
+Takes a screenshot.
+
+```typescript
+screenshot(options?: ScreenshotOptions): Promise<Buffer>
+```
+
+<ParamField path="options" type="ScreenshotOptions" optional>
+  Screenshot options
+  
+  - `path` (string): File path to save to
+  - `type` ('png' | 'jpeg'): Image type
+  - `quality` (number): JPEG quality (0-100)
+  - `fullPage` (boolean): Capture full page
+  - `clip` (object): Clip area { x, y, width, height }
+  - `omitBackground` (boolean): Transparent background
+  - `timeout` (number): Maximum time
+  - `mask` (Locator[]): Elements to mask
+</ParamField>
+
+**Returns:** `Promise<Buffer>` - Screenshot buffer
+
+### pdf
+
+Generates a PDF.
+
+```typescript
+pdf(options?: PDFOptions): Promise<Buffer>
+```
+
+<ParamField path="options" type="PDFOptions" optional>
+  PDF options
+  
+  - `path` (string): File path to save to
+  - `format` (string): Paper format (e.g., 'A4')
+  - `width` (string | number): Paper width
+  - `height` (string | number): Paper height
+  - `margin` (object): Page margins
+  - `printBackground` (boolean): Print background graphics
+  - `landscape` (boolean): Landscape orientation
+</ParamField>
+
+**Returns:** `Promise<Buffer>` - PDF buffer
+
+### close
+
+Closes the page.
+
+```typescript
+close(options?: { runBeforeUnload?: boolean, reason?: string }): Promise<void>
+```
+
+<ParamField path="options" type="object" optional>
+  - `runBeforeUnload` (boolean): Run beforeunload handlers
+  - `reason` (string): Close reason
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### isClosed
+
+Checks if page is closed.
+
+```typescript
+isClosed(): boolean
+```
+
+**Returns:** `boolean` - True if closed
+
+### context
+
+Returns the browser context.
+
+```typescript
+context(): BrowserContext
+```
+
+**Returns:** `BrowserContext` - Parent context
+
+### opener
+
+Returns the opener page.
+
+```typescript
+opener(): Promise<Page | null>
+```
+
+**Returns:** `Promise<Page | null>` - Opener page or null
+
+### bringToFront
+
+Brings page to front.
+
+```typescript
+bringToFront(): Promise<void>
+```
+
+**Returns:** `Promise<void>`
+
+### setViewportSize
+
+Sets viewport size.
+
+```typescript
+setViewportSize(viewportSize: { width: number, height: number }): Promise<void>
+```
+
+<ParamField path="viewportSize" type="object" required>
+  Viewport dimensions
+  
+  - `width` (number): Width in pixels
+  - `height` (number): Height in pixels
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### viewportSize
+
+Returns viewport size.
+
+```typescript
+viewportSize(): { width: number, height: number } | null
+```
+
+**Returns:** `object | null` - Viewport size or null
+
+### setDefaultTimeout
+
+Sets default timeout.
+
+```typescript
+setDefaultTimeout(timeout: number): void
+```
+
+<ParamField path="timeout" type="number" required>
+  Timeout in milliseconds
+</ParamField>
+
+### setDefaultNavigationTimeout
+
+Sets default navigation timeout.
+
+```typescript
+setDefaultNavigationTimeout(timeout: number): void
+```
+
+<ParamField path="timeout" type="number" required>
+  Timeout in milliseconds
+</ParamField>
+
+### workers
+
+Returns all workers.
+
+```typescript
+workers(): Worker[]
+```
+
+**Returns:** `Worker[]` - Array of workers
+
+## Usage Examples
+
+### Basic Page Automation
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+
+await page.goto('https://example.com');
+await page.click('button#submit');
+await page.fill('input[name="email"]', 'test@example.com');
+await page.screenshot({ path: 'screenshot.png' });
+
+await browser.close();
+```
+
+### Using Locators
+
+```typescript
+const page = await browser.newPage();
+await page.goto('https://example.com');
+
+const button = page.getByRole('button', { name: 'Submit' });
+await button.click();
+
+const input = page.getByPlaceholder('Enter your email');
+await input.fill('test@example.com');
+
+const heading = page.getByText('Welcome');
+await expect(heading).toBeVisible();
+```
+
+### Form Interactions
+
+```typescript
+const page = await browser.newPage();
+await page.goto('https://example.com/form');
+
+await page.fill('#name', 'John Doe');
+await page.fill('#email', 'john@example.com');
+await page.check('#terms');
+await page.selectOption('#country', 'US');
+await page.click('button[type="submit"]');
+
+await page.waitForURL('**/success');
+```
+
+## Related Classes
+
+- [BrowserContext](/api/browser-context) - Parent context
+- [Frame](/api/frame) - Page frames
+- [Locator](/api/locator) - Element locators
+- [ElementHandle](/api/element-handle) - Element handles

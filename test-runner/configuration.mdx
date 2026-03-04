@@ -1,0 +1,501 @@
+---
+title: 'Test Runner Configuration'
+description: 'Configure Playwright Test Runner with comprehensive options for projects, browsers, timeouts, and more'
+---
+
+## Configuration File
+
+Playwright Test uses a configuration file named `playwright.config.ts` at the project root:
+
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+});
+```
+
+## Configuration Options
+
+The configuration is defined in `src/common/config.ts:42-149`. Here are the key options:
+
+### Test Discovery
+
+<ParamField path="testDir" type="string" default="'.'">
+  Directory where test files are located
+
+  ```typescript
+  testDir: './e2e'
+  ```
+</ParamField>
+
+<ParamField path="testMatch" type="string | RegExp | Array" default="'**/*.@(spec|test).?(c|m)[jt]s?(x)'">
+  Pattern to match test files
+
+  ```typescript
+  testMatch: '**/*.spec.ts'
+  ```
+</ParamField>
+
+<ParamField path="testIgnore" type="string | RegExp | Array" default="[]">
+  Pattern to ignore test files
+
+  ```typescript
+  testIgnore: '**/node_modules/**'
+  ```
+</ParamField>
+
+### Execution Control
+
+<ParamField path="workers" type="number | string" default="'50%'">
+  Number of concurrent worker processes
+
+  From `src/common/config.ts:121`:
+  ```typescript
+  workers: 4,           // Fixed number
+  workers: '50%',       // Percentage of CPU cores
+  workers: undefined,   // Auto-detect based on CPU
+  ```
+</ParamField>
+
+<ParamField path="fullyParallel" type="boolean" default="false">
+  Run all tests in parallel
+
+  From `src/common/config.ts:102`:
+  ```typescript
+  fullyParallel: true
+  ```
+</ParamField>
+
+<ParamField path="forbidOnly" type="boolean" default="false">
+  Fail if `test.only` is encountered
+
+  ```typescript
+  forbidOnly: !!process.env.CI
+  ```
+</ParamField>
+
+<ParamField path="maxFailures" type="number" default="0">
+  Maximum number of test failures before stopping
+
+  From `src/common/config.ts:108`:
+  ```typescript
+  maxFailures: 10  // Stop after 10 failures
+  ```
+</ParamField>
+
+### Timeouts
+
+<ParamField path="timeout" type="number" default="30000">
+  Timeout for each test in milliseconds
+
+  From `src/common/config.ts:40,199`:
+  ```typescript
+  export const defaultTimeout = 30000;  // 30 seconds
+  
+  timeout: 60000  // 60 seconds
+  ```
+</ParamField>
+
+<ParamField path="globalTimeout" type="number" default="0">
+  Maximum time for the entire test run
+
+  From `src/common/config.ts:105`:
+  ```typescript
+  globalTimeout: 60 * 60 * 1000  // 1 hour
+  ```
+</ParamField>
+
+<ParamField path="expect.timeout" type="number" default="5000">
+  Timeout for expect assertions
+
+  ```typescript
+  use: {
+    expect: {
+      timeout: 10000  // 10 seconds for assertions
+    }
+  }
+  ```
+</ParamField>
+
+### Retries
+
+<ParamField path="retries" type="number" default="0">
+  Number of retry attempts for failed tests
+
+  From `src/common/config.ts:192`:
+  ```typescript
+  retries: 2  // Retry failed tests twice
+  ```
+</ParamField>
+
+<ParamField path="repeatEach" type="number" default="1">
+  Number of times to repeat each test
+
+  From `src/common/config.ts:191`:
+  ```typescript
+  repeatEach: 3  // Run each test 3 times
+  ```
+</ParamField>
+
+### Filtering
+
+<ParamField path="grep" type="RegExp | Array<RegExp>" default="/.*/">
+  Filter tests by title
+
+  From `src/common/config.ts:106-107`:
+  ```typescript
+  grep: /login/,              // Run tests matching "login"
+  grep: [/@smoke/, /@fast/],  // Multiple patterns
+  ```
+</ParamField>
+
+<ParamField path="grepInvert" type="RegExp | Array<RegExp>" default="null">
+  Exclude tests by title
+
+  ```typescript
+  grepInvert: /@slow/  // Skip tests with @slow tag
+  ```
+</ParamField>
+
+### Output and Artifacts
+
+<ParamField path="outputDir" type="string" default="'test-results'">
+  Directory for test artifacts
+
+  From `src/common/config.ts:188`:
+  ```typescript
+  outputDir: './test-results'
+  ```
+</ParamField>
+
+<ParamField path="snapshotDir" type="string">
+  Directory for snapshots
+
+  From `src/common/config.ts:196`:
+  ```typescript
+  snapshotDir: './snapshots'
+  ```
+</ParamField>
+
+<ParamField path="preserveOutput" type="'always' | 'never' | 'failures-only'" default="'always'">
+  When to preserve output directory
+
+  From `src/common/config.ts:110`:
+  ```typescript
+  preserveOutput: 'failures-only'
+  ```
+</ParamField>
+
+### Reporters
+
+<ParamField path="reporter" type="string | Array" default="'list'">
+  Test reporters to use
+
+  From `src/common/config.ts:113,296`:
+  ```typescript
+  // Built-in reporters: 'list', 'line', 'dot', 'json', 'junit', 
+  // 'null', 'github', 'html', 'blob'
+  
+  reporter: 'html',
+  reporter: [['html', { open: 'never' }], ['json', { outputFile: 'results.json' }]]
+  ```
+</ParamField>
+
+<ParamField path="reportSlowTests" type="object" default="{ max: 5, threshold: 300000 }">
+  Report slow tests
+
+  From `src/common/config.ts:114`:
+  ```typescript
+  reportSlowTests: {
+    max: 10,           // Report top 10 slow tests
+    threshold: 15000   // Tests slower than 15s
+  }
+  ```
+</ParamField>
+
+### Global Setup/Teardown
+
+<ParamField path="globalSetup" type="string">
+  Path to global setup file
+
+  From `src/common/config.ts:85-86,103`:
+  ```typescript
+  globalSetup: './global-setup.ts'
+  ```
+</ParamField>
+
+<ParamField path="globalTeardown" type="string">
+  Path to global teardown file
+
+  From `src/common/config.ts:85-86,104`:
+  ```typescript
+  globalTeardown: './global-teardown.ts'
+  ```
+</ParamField>
+
+### Projects
+
+<ParamField path="projects" type="Array<Project>">
+  Configure multiple test projects
+
+  From `src/common/config.ts:144-149,168-216`:
+  ```typescript
+  projects: [
+    {
+      name: 'chromium',
+      use: { browserName: 'chromium' },
+    },
+    {
+      name: 'firefox',
+      use: { browserName: 'firefox' },
+      testDir: './firefox-tests',
+      timeout: 45000,
+    },
+    {
+      name: 'api',
+      testDir: './api-tests',
+      dependencies: ['setup-db'],
+    },
+    {
+      name: 'cleanup',
+      teardown: 'api',
+    },
+  ]
+  ```
+</ParamField>
+
+### Project Dependencies
+
+From `src/common/config.ts:254-286`:
+
+```typescript
+projects: [
+  {
+    name: 'setup',
+    testMatch: /.*\.setup\.ts/,
+  },
+  {
+    name: 'chromium',
+    use: { ...devices['Desktop Chrome'] },
+    dependencies: ['setup'],  // Run setup first
+  },
+  {
+    name: 'teardown',
+    testMatch: /.*\.teardown\.ts/,
+    teardown: 'chromium',     // Run after chromium
+  },
+]
+```
+
+<Warning>
+Teardown projects must not have dependencies. Projects cannot depend on teardown projects.
+</Warning>
+
+### Sharding
+
+<ParamField path="shard" type="object">
+  Distribute tests across multiple machines
+
+  From `src/common/config.ts:116`:
+  ```typescript
+  shard: { total: 4, current: 1 }
+  ```
+
+  CLI usage:
+  ```bash
+  npx playwright test --shard=1/4
+  ```
+</ParamField>
+
+### Web Server
+
+<ParamField path="webServer" type="object | Array">
+  Start a local development server before tests
+
+  From `src/common/config.ts:131-141`:
+  ```typescript
+  webServer: {
+    command: 'npm run start',
+    port: 3000,
+    timeout: 120 * 1000,
+    reuseExistingServer: !process.env.CI,
+  }
+  
+  // Multiple servers
+  webServer: [
+    {
+      command: 'npm run api',
+      port: 8080,
+    },
+    {
+      command: 'npm run ui',
+      port: 3000,
+    },
+  ]
+  ```
+</ParamField>
+
+### Browser Options
+
+```typescript
+use: {
+  // Browser context options
+  viewport: { width: 1280, height: 720 },
+  ignoreHTTPSErrors: true,
+  locale: 'en-US',
+  timezoneId: 'America/New_York',
+  permissions: ['geolocation'],
+  geolocation: { latitude: 37.7749, longitude: -122.4194 },
+  colorScheme: 'dark',
+  
+  // Network
+  baseURL: 'http://localhost:3000',
+  extraHTTPHeaders: {
+    'X-Custom-Header': 'value',
+  },
+  httpCredentials: {
+    username: 'user',
+    password: 'pass',
+  },
+  
+  // Behavior
+  actionTimeout: 10000,
+  navigationTimeout: 30000,
+  screenshot: 'only-on-failure',
+  video: 'retain-on-failure',
+  trace: 'on-first-retry',
+}
+```
+
+## Configuration Merging
+
+Project configurations merge with global configuration:
+
+From `src/common/config.ts:200`:
+```typescript
+use: mergeObjects(config.use, projectConfig.use, configCLIOverrides.use)
+```
+
+**Priority (lowest to highest):**
+1. Global config `use` object
+2. Project config `use` object  
+3. CLI overrides
+
+## Environment Variables
+
+```typescript
+export default defineConfig({
+  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 0,
+  use: {
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+  },
+});
+```
+
+## TypeScript Configuration
+
+<ParamField path="tsconfig" type="string">
+  Path to TypeScript configuration
+
+  From `src/common/config.ts:81`:
+  ```typescript
+  tsconfig: './tsconfig.test.json'
+  ```
+</ParamField>
+
+## Example: Complete Configuration
+
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  testMatch: '**/*.spec.ts',
+  testIgnore: '**/*.skip.ts',
+  
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  workers: process.env.CI ? 2 : undefined,
+  retries: process.env.CI ? 2 : 0,
+  
+  timeout: 30000,
+  globalTimeout: 60 * 60 * 1000,
+  
+  expect: {
+    timeout: 5000,
+  },
+  
+  outputDir: './test-results',
+  preserveOutput: 'failures-only',
+  
+  reporter: [
+    ['html', { open: 'never' }],
+    ['json', { outputFile: 'results.json' }],
+    ['junit', { outputFile: 'junit.xml' }],
+  ],
+  
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    actionTimeout: 10000,
+  },
+  
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+    },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['iPhone 12'] },
+      dependencies: ['setup'],
+    },
+  ],
+  
+  webServer: {
+    command: 'npm run start',
+    port: 3000,
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Test Fixtures" icon="puzzle-piece" href="/test-runner/test-fixtures">
+    Learn about fixture configuration
+  </Card>
+  <Card title="Parallelization" icon="layer-group" href="/test-runner/parallelization">
+    Optimize test execution
+  </Card>
+</CardGroup>

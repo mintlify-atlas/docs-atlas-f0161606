@@ -1,0 +1,167 @@
+---
+title: Mouse
+description: API reference for the Playwright Mouse class for simulating mouse interactions.
+---
+
+The Mouse class provides methods to simulate mouse interactions such as moving, clicking, and scrolling. Access the Mouse instance through `page.mouse`.
+
+## Methods
+
+### move
+
+Moves the mouse to the specified position.
+
+```javascript
+await page.mouse.move(100, 200);
+await page.mouse.move(150, 250, { steps: 5 });
+```
+
+<ParamField path="x" type="number" required>
+  The x coordinate to move to
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  The y coordinate to move to
+</ParamField>
+
+<ParamField path="options.steps" type="number">
+  Number of intermediate steps to use when moving the mouse. Defaults to 1 (instant movement).
+</ParamField>
+
+---
+
+### down
+
+Presses a mouse button without releasing it.
+
+```javascript
+await page.mouse.down();
+await page.mouse.down({ button: 'right' });
+```
+
+<ParamField path="options.button" type="'left' | 'right' | 'middle'">
+  The button to press. Defaults to 'left'.
+</ParamField>
+
+<ParamField path="options.clickCount" type="number">
+  Number of times the button is clicked. Defaults to 1.
+</ParamField>
+
+---
+
+### up
+
+Releases a mouse button.
+
+```javascript
+await page.mouse.up();
+await page.mouse.up({ button: 'right' });
+```
+
+<ParamField path="options.button" type="'left' | 'right' | 'middle'">
+  The button to release. Defaults to 'left'.
+</ParamField>
+
+<ParamField path="options.clickCount" type="number">
+  Number of times the button is clicked. Defaults to 1.
+</ParamField>
+
+---
+
+### click
+
+Clicks at the specified position.
+
+```javascript
+await page.mouse.click(100, 200);
+await page.mouse.click(100, 200, { button: 'right', delay: 100 });
+```
+
+<ParamField path="x" type="number" required>
+  The x coordinate to click at
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  The y coordinate to click at
+</ParamField>
+
+<ParamField path="options.button" type="'left' | 'right' | 'middle'">
+  The button to click. Defaults to 'left'.
+</ParamField>
+
+<ParamField path="options.clickCount" type="number">
+  Number of times to click. Defaults to 1.
+</ParamField>
+
+<ParamField path="options.delay" type="number">
+  Time to wait between mousedown and mouseup in milliseconds. Defaults to 0.
+</ParamField>
+
+---
+
+### dblclick
+
+Double-clicks at the specified position.
+
+```javascript
+await page.mouse.dblclick(100, 200);
+await page.mouse.dblclick(100, 200, { delay: 100 });
+```
+
+<ParamField path="x" type="number" required>
+  The x coordinate to double-click at
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  The y coordinate to double-click at
+</ParamField>
+
+<ParamField path="options.button" type="'left' | 'right' | 'middle'">
+  The button to click. Defaults to 'left'.
+</ParamField>
+
+<ParamField path="options.delay" type="number">
+  Time to wait between clicks in milliseconds. Defaults to 0.
+</ParamField>
+
+---
+
+### wheel
+
+Scrolls the page using the mouse wheel.
+
+```javascript
+await page.mouse.wheel(0, 100);
+await page.mouse.wheel(50, 200);
+```
+
+<ParamField path="deltaX" type="number" required>
+  Horizontal scroll amount in pixels
+</ParamField>
+
+<ParamField path="deltaY" type="number" required>
+  Vertical scroll amount in pixels
+</ParamField>
+
+## Example Usage
+
+### Drag and Drop
+
+```javascript
+await page.mouse.move(100, 100);
+await page.mouse.down();
+await page.mouse.move(200, 200, { steps: 5 });
+await page.mouse.up();
+```
+
+### Context Menu
+
+```javascript
+await page.mouse.click(100, 100, { button: 'right' });
+```
+
+### Scroll Page
+
+```javascript
+await page.mouse.wheel(0, 500);
+```

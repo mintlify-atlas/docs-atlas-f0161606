@@ -1,0 +1,228 @@
+---
+title: Selectors
+description: API for managing custom selector engines in Playwright
+---
+
+The Selectors API allows you to register custom selector engines that can be used throughout Playwright to locate elements.
+
+## Overview
+
+Playwright supports multiple built-in selector engines (CSS, XPath, text, etc.). You can extend this with custom selector engines to match elements based on your own logic.
+
+```typescript
+import { selectors } from '@playwright/test';
+
+// Register a custom selector engine
+await selectors.register('tag', {
+  query(root, selector) {
+    return root.querySelector(selector.toUpperCase());
+  },
+  queryAll(root, selector) {
+    return Array.from(root.querySelectorAll(selector.toUpperCase()));
+  },
+});
+
+// Use the custom selector
+await page.locator('tag=button').click();
+```
+
+## Methods
+
+### register(name, script, options)
+
+Register a custom selector engine.
+
+<ParamField path="name" type="string" required>
+  Name of the selector engine. Once registered, you can use it with the syntax `name=selector`.
+</ParamField>
+
+<ParamField path="script" type="string | Function | { path?: string, content?: string }" required>
+  Script that evaluates to a selector engine instance. Can be:
+  - A function that returns a selector engine
+  - A string containing JavaScript code
+  - An object with `path` to a JavaScript file or `content` with the code
+</ParamField>
+
+<ParamField path="options.contentScript" type="boolean" default="false">
+  Whether to run the selector engine script as a content script in the page context. Only applies to Chromium.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+#### Selector Engine Interface
+
+Your selector engine must implement:
+
+```typescript
+interface SelectorEngine {
+  // Find the first matching element
+  query(root: Element, selector: string): Element | null;
+  
+  // Find all matching elements
+  queryAll(root: Element, selector: string): Element[];
+}
+```
+
+#### Example: Tag Name Selector
+
+```typescript
+await selectors.register('tag', () => {
+  return {
+    query(root, selector) {
+      return root.querySelector(selector.toUpperCase());
+    },
+    queryAll(root, selector) {
+      return Array.from(root.querySelectorAll(selector.toUpperCase()));
+    },
+  };
+});
+
+// Usage
+await page.click('tag=button');
+```
+
+#### Example: Data Attribute Selector
+
+```typescript
+await selectors.register('data', () => {
+  return {
+    query(root, selector) {
+      return root.querySelector(`[data-test="${selector}"]`);
+    },
+    queryAll(root, selector) {
+      return Array.from(root.querySelectorAll(`[data-test="${selector}"]`));
+    },
+  };
+});
+
+// Usage
+await page.locator('data=submit-button').click();
+```
+
+#### Example: Loading from File
+
+```typescript
+await selectors.register('custom', {
+  path: './my-selector-engine.js',
+});
+```
+
+### setTestIdAttribute(attributeName)
+
+Set the attribute name to use for `getByTestId()` locators.
+
+<ParamField path="attributeName" type="string" required>
+  Attribute name to use for test ID selectors
+</ParamField>
+
+**Returns:** `void`
+
+By default, Playwright uses `data-testid` attribute. Change it to match your project's convention:
+
+```typescript
+import { selectors } from '@playwright/test';
+
+// Use 'data-test' instead of 'data-testid'
+selectors.setTestIdAttribute('data-test');
+
+// Now this will look for data-test="my-button"
+await page.getByTestId('my-button').click();
+```
+
+You can also configure this in `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    testIdAttribute: 'data-test',
+  },
+});
+```
+
+## Complete Example
+
+```typescript
+import { test, selectors } from '@playwright/test';
+
+// Register selector engine before tests run
+test.beforeAll(async () => {
+  // Register a custom selector for aria-label
+  await selectors.register('label', () => {
+    return {
+      query(root, selector) {
+        return root.querySelector(`[aria-label="${selector}"]`);
+      },
+      queryAll(root, selector) {
+        return Array.from(
+          root.querySelectorAll(`[aria-label="${selector}"]`)
+        );
+      },
+    };
+  });
+
+  // Change test ID attribute
+  selectors.setTestIdAttribute('data-qa');
+});
+
+test('use custom selectors', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Use custom 'label' selector
+  await page.click('label=Submit');
+  
+  // Use modified test ID attribute
+  await page.getByTestId('login-button').click(); // Looks for data-qa
+});
+```
+
+## Best Practices
+
+### Selector Engine Naming
+
+- Use descriptive names that indicate what the selector matches
+- Avoid names that conflict with built-in engines (css, xpath, text, etc.)
+- Use lowercase names for consistency
+
+### Error Handling
+
+```typescript
+await selectors.register('safe', () => {
+  return {
+    query(root, selector) {
+      try {
+        return root.querySelector(selector);
+      } catch (e) {
+        console.error('Selector error:', e);
+        return null;
+      }
+    },
+    queryAll(root, selector) {
+      try {
+        return Array.from(root.querySelectorAll(selector));
+      } catch (e) {
+        console.error('Selector error:', e);
+        return [];
+      }
+    },
+  };
+});
+```
+
+### Performance
+
+- Keep selector logic simple and fast
+- Avoid expensive computations in `queryAll`
+- Cache results when appropriate
+
+## Limitations
+
+- Custom selectors cannot be registered after tests have started
+- Each selector engine name can only be registered once
+- Content script mode only works in Chromium
+
+## Related
+
+- [Locators](/api/locator) - Element location API
+- [Built-in Selectors](/selectors) - Playwright's default selectors

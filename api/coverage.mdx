@@ -1,0 +1,258 @@
+---
+title: Coverage
+description: API reference for Playwright Coverage class for collecting code coverage
+---
+
+The Coverage class enables collecting JavaScript and CSS coverage information during test execution. This helps identify which parts of your code are executed during tests.
+
+## Overview
+
+Access coverage through the page object:
+
+```typescript
+const coverage = page.coverage;
+```
+
+## JavaScript Coverage
+
+### startJSCoverage
+
+Starts collecting JavaScript coverage.
+
+```typescript
+await coverage.startJSCoverage();
+await coverage.startJSCoverage({
+  resetOnNavigation: false,
+  reportAnonymousScripts: true
+});
+```
+
+<ParamField path="options.resetOnNavigation" type="boolean" default="true">
+  Whether to reset coverage on every navigation.
+</ParamField>
+
+<ParamField path="options.reportAnonymousScripts" type="boolean" default="false">
+  Whether to report anonymous scripts.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### stopJSCoverage
+
+Stops collecting JavaScript coverage and returns results.
+
+```typescript
+const jsCoverage = await coverage.stopJSCoverage();
+
+for (const entry of jsCoverage) {
+  console.log(`${entry.url}: ${entry.ranges.length} ranges`);
+}
+```
+
+**Returns:** `Promise<JSCoverageEntry[]>`
+
+Each entry contains:
+
+<ParamField path="url" type="string">
+  Script URL.
+</ParamField>
+
+<ParamField path="ranges" type="Array<{ start: number, end: number }>">
+  Executed code ranges. Each range specifies:
+  - `start`: Start offset in the script
+  - `end`: End offset in the script
+</ParamField>
+
+<ParamField path="source" type="string">
+  Script source code.
+</ParamField>
+
+## CSS Coverage
+
+### startCSSCoverage
+
+Starts collecting CSS coverage.
+
+```typescript
+await coverage.startCSSCoverage();
+await coverage.startCSSCoverage({
+  resetOnNavigation: false
+});
+```
+
+<ParamField path="options.resetOnNavigation" type="boolean" default="true">
+  Whether to reset coverage on every navigation.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### stopCSSCoverage
+
+Stops collecting CSS coverage and returns results.
+
+```typescript
+const cssCoverage = await coverage.stopCSSCoverage();
+
+for (const entry of cssCoverage) {
+  console.log(`${entry.url}: ${entry.ranges.length} ranges`);
+}
+```
+
+**Returns:** `Promise<CSSCoverageEntry[]>`
+
+Each entry contains:
+
+<ParamField path="url" type="string">
+  Stylesheet URL.
+</ParamField>
+
+<ParamField path="ranges" type="Array<{ start: number, end: number }>">
+  Used CSS ranges. Each range specifies:
+  - `start`: Start offset in the stylesheet
+  - `end`: End offset in the stylesheet
+</ParamField>
+
+<ParamField path="source" type="string">
+  Stylesheet source code.
+</ParamField>
+
+## Examples
+
+### Collecting JavaScript coverage
+
+```typescript
+import { test } from '@playwright/test';
+import * as fs from 'fs';
+
+test('collect JS coverage', async ({ page }) => {
+  await page.coverage.startJSCoverage();
+  
+  await page.goto('https://example.com');
+  await page.click('#button');
+  
+  const coverage = await page.coverage.stopJSCoverage();
+  
+  // Save coverage data
+  fs.writeFileSync('coverage.json', JSON.stringify(coverage, null, 2));
+});
+```
+
+### Collecting CSS coverage
+
+```typescript
+test('collect CSS coverage', async ({ page }) => {
+  await page.coverage.startCSSCoverage();
+  
+  await page.goto('https://example.com');
+  
+  const coverage = await page.coverage.stopCSSCoverage();
+  
+  // Calculate unused CSS
+  let totalBytes = 0;
+  let usedBytes = 0;
+  
+  for (const entry of coverage) {
+    totalBytes += entry.source.length;
+    for (const range of entry.ranges) {
+      usedBytes += range.end - range.start;
+    }
+  }
+  
+  console.log(`Used CSS: ${(usedBytes / totalBytes * 100).toFixed(2)}%`);
+});
+```
+
+### Collecting both JS and CSS coverage
+
+```typescript
+test('collect all coverage', async ({ page }) => {
+  await Promise.all([
+    page.coverage.startJSCoverage(),
+    page.coverage.startCSSCoverage()
+  ]);
+  
+  await page.goto('https://example.com');
+  await page.click('#interactive-element');
+  
+  const [jsCoverage, cssCoverage] = await Promise.all([
+    page.coverage.stopJSCoverage(),
+    page.coverage.stopCSSCoverage()
+  ]);
+  
+  console.log(`JS files: ${jsCoverage.length}`);
+  console.log(`CSS files: ${cssCoverage.length}`);
+});
+```
+
+### Coverage across multiple pages
+
+```typescript
+test('coverage across pages', async ({ page }) => {
+  await page.coverage.startJSCoverage({
+    resetOnNavigation: false
+  });
+  
+  await page.goto('https://example.com/page1');
+  await page.click('[href="/page2"]');
+  await page.waitForURL('**/page2');
+  
+  const coverage = await page.coverage.stopJSCoverage();
+  
+  // Coverage includes data from both pages
+  console.log(`Total coverage entries: ${coverage.length}`);
+});
+```
+
+### Filtering coverage results
+
+```typescript
+test('filter coverage', async ({ page }) => {
+  await page.coverage.startJSCoverage();
+  
+  await page.goto('https://example.com');
+  
+  const coverage = await page.coverage.stopJSCoverage();
+  
+  // Filter to only your application code
+  const appCoverage = coverage.filter(entry => 
+    entry.url.includes('example.com') && 
+    !entry.url.includes('node_modules')
+  );
+  
+  console.log(`App coverage entries: ${appCoverage.length}`);
+});
+```
+
+### Calculating coverage percentage
+
+```typescript
+function calculateCoverage(coverage: any[]) {
+  let totalBytes = 0;
+  let usedBytes = 0;
+  
+  for (const entry of coverage) {
+    totalBytes += entry.source.length;
+    for (const range of entry.ranges) {
+      usedBytes += range.end - range.start;
+    }
+  }
+  
+  return {
+    totalBytes,
+    usedBytes,
+    percentage: (usedBytes / totalBytes * 100).toFixed(2)
+  };
+}
+
+test('coverage percentage', async ({ page }) => {
+  await page.coverage.startJSCoverage();
+  
+  await page.goto('https://example.com');
+  
+  const coverage = await page.coverage.stopJSCoverage();
+  const stats = calculateCoverage(coverage);
+  
+  console.log(`Coverage: ${stats.percentage}%`);
+  console.log(`Used: ${stats.usedBytes} / ${stats.totalBytes} bytes`);
+});
+```

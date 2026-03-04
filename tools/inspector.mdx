@@ -1,0 +1,299 @@
+---
+title: 'Playwright Inspector'
+description: 'Debug tests with the Playwright Inspector - pause, step through, and inspect test execution'
+---
+
+## Overview
+
+The Playwright Inspector is a GUI tool that allows you to step through Playwright API calls, see debug logs, explore locators, and visually inspect the DOM during test execution. It's essential for debugging failing tests and understanding test behavior.
+
+## Launching the Inspector
+
+### Debug Mode
+
+The easiest way to use the Inspector is with the `--debug` flag:
+
+```bash
+npx playwright test --debug
+```
+
+This automatically:
+- Opens the Playwright Inspector
+- Runs tests in headed mode
+- Sets workers to 1
+- Disables timeout
+- Stops at the first failure
+
+### Debug Specific Tests
+
+```bash
+# Debug a specific test file
+npx playwright test example.spec.ts --debug
+
+# Debug tests matching a pattern
+npx playwright test --debug -g "login flow"
+
+# Debug from a specific line
+npx playwright test example.spec.ts:42 --debug
+```
+
+### Environment Variable
+
+You can also enable debug mode using the `PWDEBUG` environment variable:
+
+```bash
+PWDEBUG=1 npx playwright test
+```
+
+This is useful in CI/CD pipelines or when you need more control over test execution options.
+
+## Inspector Interface
+
+The Inspector window provides several key areas:
+
+### Action Log
+
+Shows all Playwright API calls with:
+- Method name (e.g., `page.goto()`, `page.click()`)
+- Arguments passed
+- Execution time
+- Success/failure status
+
+### Source Code View
+
+Displays your test code with:
+- Current execution line highlighted
+- Ability to click line numbers to set breakpoints
+- Stack trace navigation
+
+### Toolbar Controls
+
+<Steps>
+  <Step title="Resume (F8)">
+    Continue test execution until the next breakpoint or test end
+  </Step>
+  
+  <Step title="Step Over (F10)">
+    Execute the current line and pause at the next line in the same function
+  </Step>
+  
+  <Step title="Step Into (F11)">
+    Step into function calls to debug helper functions
+  </Step>
+  
+  <Step title="Step Out (Shift+F11)">
+    Continue until the current function returns
+  </Step>
+</Steps>
+
+## Using Breakpoints
+
+### Programmatic Breakpoints
+
+Add breakpoints directly in your test code:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('debug example', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Pause execution here
+  await page.pause();
+  
+  await page.click('button');
+  expect(await page.textContent('h1')).toBe('Success');
+});
+```
+
+### Conditional Breakpoints
+
+```typescript
+test('conditional debug', async ({ page }) => {
+  const items = await page.locator('.item').all();
+  
+  for (const item of items) {
+    const text = await item.textContent();
+    
+    // Only pause for specific items
+    if (text?.includes('Debug Me')) {
+      await page.pause();
+    }
+  }
+});
+```
+
+## Locator Exploration
+
+The Inspector includes a powerful locator panel:
+
+### Pick Locator
+
+1. Click the "Pick Locator" button (or press Ctrl/Cmd+Shift+C)
+2. Hover over elements in the browser
+3. Click an element to copy its locator
+
+The Inspector generates the best possible locator using:
+- Role-based selectors (preferred)
+- Text content
+- Test IDs
+- CSS selectors (fallback)
+
+### Test Locators
+
+Type a locator in the input field to:
+- See matching elements highlighted in the browser
+- Verify selector specificity
+- Test different locator strategies
+
+```typescript
+// Examples you can test in the locator panel
+getByRole('button', { name: 'Submit' })
+getByText('Welcome')
+getByTestId('user-menu')
+page.locator('.header >> text=Login')
+```
+
+## Inspector Features
+
+### Screencasting
+
+The Inspector provides live screencasting through the `Inspector` API:
+
+```typescript
+import { test } from '@playwright/test';
+
+test('with screencast', async ({ page }) => {
+  const inspector = page.inspector();
+  
+  // Start screencasting
+  await inspector.startScreencast({
+    size: { width: 1280, height: 720 }
+  });
+  
+  inspector.on('screencastframe', ({ data, width, height }) => {
+    // Process frame data (base64 encoded image)
+    console.log(`Frame: ${width}x${height}`);
+  });
+  
+  // Your test actions
+  await page.goto('https://example.com');
+  
+  // Stop screencasting
+  await inspector.stopScreencast();
+});
+```
+
+This is implemented in `/home/daytona/workspace/source/packages/playwright-core/src/client/inspector.ts:31`.
+
+### Console Logs
+
+View console messages from the browser:
+- `console.log()`
+- `console.error()`
+- `console.warn()`
+- Uncaught exceptions
+
+### Network Activity
+
+Inspect network requests:
+- Request URL and method
+- Response status
+- Request/response headers
+- Timing information
+
+## Debugging Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start Small" icon="magnifying-glass">
+    Debug one test at a time with specific selectors using `-g` flag.
+  </Card>
+  
+  <Card title="Use page.pause()" icon="pause">
+    Add strategic pauses before actions that fail to inspect state.
+  </Card>
+  
+  <Card title="Check Selectors" icon="crosshairs">
+    Use the locator panel to verify selectors match the expected elements.
+  </Card>
+  
+  <Card title="Review Logs" icon="list">
+    Check console output for JavaScript errors or warnings.
+  </Card>
+</CardGroup>
+
+## Common Debugging Scenarios
+
+### Element Not Found
+
+```typescript
+test('debug element not found', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Pause to inspect the page
+  await page.pause();
+  
+  // Use the locator panel to find the correct selector
+  await page.locator('button.submit').click();
+});
+```
+
+### Timing Issues
+
+```typescript
+test('debug timing', async ({ page }) => {
+  await page.goto('https://example.com');
+  await page.click('button');
+  
+  // Pause to see if element appeared
+  await page.pause();
+  
+  // Check if we need to wait for something
+  await page.waitForSelector('.result');
+  await expect(page.locator('.result')).toBeVisible();
+});
+```
+
+### Failed Assertions
+
+```typescript
+test('debug assertion', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const text = await page.textContent('h1');
+  console.log('Actual text:', text);
+  
+  await page.pause();
+  
+  // Now we can see what the actual value is
+  expect(text).toBe('Expected Text');
+});
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `F8` | Resume execution |
+| `F10` | Step over |
+| `F11` | Step into |
+| `Shift+F11` | Step out |
+| `Ctrl/Cmd+Shift+C` | Pick locator |
+| `Ctrl/Cmd+\` | Toggle inspector |
+
+## Inspector vs Other Tools
+
+<Note>
+The Inspector is different from browser DevTools. While DevTools shows the DOM and browser state, the Inspector shows Playwright API calls and test execution flow.
+</Note>
+
+Use together:
+- **Inspector**: For Playwright-specific debugging (locators, API calls, test flow)
+- **DevTools**: For browser-specific debugging (DOM, CSS, JavaScript)
+- **Trace Viewer**: For post-execution analysis of completed tests
+
+## See Also
+
+- [Code Generator](/tools/codegen) - Generate tests by recording actions
+- [Trace Viewer](/tools/trace-viewer) - Analyze test traces
+- [UI Mode](/tools/ui-mode) - Interactive test runner with debugging

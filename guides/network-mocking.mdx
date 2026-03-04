@@ -1,0 +1,359 @@
+---
+title: 'Network Mocking'
+description: 'Intercept and mock network requests in Playwright to test edge cases and control API responses'
+---
+
+## Overview
+
+Playwright's network interception capabilities allow you to mock API responses, simulate network failures, and test edge cases without depending on external services.
+
+## Basic Request Interception
+
+### Intercepting Requests
+
+Use `page.route()` to intercept and handle network requests:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('intercept API request', async ({ page }) => {
+  // Intercept all requests to /api/user
+  await page.route('**/api/user', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 1,
+        name: 'John Doe',
+        email: 'john@example.com',
+      }),
+    });
+  });
+
+  await page.goto('https://example.com/profile');
+  await expect(page.getByText('John Doe')).toBeVisible();
+});
+```
+
+### Pattern Matching
+
+Playwright supports multiple pattern types for route matching:
+
+<CodeGroup>
+```typescript Glob Patterns
+await page.route('**/api/**', route => route.fulfill({...}));
+await page.route('**/*.{png,jpg,jpeg}', route => route.abort());
+```
+
+```typescript RegEx Patterns
+await page.route(/\.(png|jpg)$/, route => route.abort());
+await page.route(/api\/users\/\d+/, route => route.fulfill({...}));
+```
+
+```typescript Exact URL
+await page.route(
+  'https://api.example.com/users', 
+  route => route.fulfill({...})
+);
+```
+</CodeGroup>
+
+## Mocking API Responses
+
+### Mock with Static Data
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('display user list', async ({ page }) => {
+  await page.route('**/api/users', async (route) => {
+    await route.fulfill({
+      status: 200,
+      body: JSON.stringify([
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' },
+        { id: 3, name: 'Charlie' },
+      ]),
+    });
+  });
+
+  await page.goto('https://example.com/users');
+  await expect(page.getByText('Alice')).toBeVisible();
+  await expect(page.getByText('Bob')).toBeVisible();
+  await expect(page.getByText('Charlie')).toBeVisible();
+});
+```
+
+### Mock from File
+
+```typescript
+import { test, expect } from '@playwright/test';
+import path from 'path';
+
+test('load data from fixture', async ({ page }) => {
+  await page.route('**/api/products', async (route) => {
+    await route.fulfill({
+      path: path.join(__dirname, 'fixtures/products.json'),
+    });
+  });
+
+  await page.goto('https://example.com/shop');
+  await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible();
+});
+```
+
+## Modifying Requests and Responses
+
+### Modify Request Headers
+
+```typescript
+await page.route('**/api/**', async (route) => {
+  const headers = {
+    ...route.request().headers(),
+    'X-Custom-Header': 'custom-value',
+    'Authorization': 'Bearer mock-token',
+  };
+  
+  await route.continue({ headers });
+});
+```
+
+### Modify Response
+
+```typescript
+await page.route('**/api/user', async (route) => {
+  // Get original response
+  const response = await route.fetch();
+  const json = await response.json();
+  
+  // Modify response data
+  json.isAdmin = true;
+  json.permissions = ['read', 'write', 'delete'];
+  
+  // Fulfill with modified data
+  await route.fulfill({
+    response,
+    json,
+  });
+});
+```
+
+## Simulating Network Conditions
+
+### Simulate Network Errors
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('handle network failure', async ({ page }) => {
+  await page.route('**/api/data', (route) => route.abort('failed'));
+  
+  await page.goto('https://example.com');
+  await expect(page.getByText('Network error occurred')).toBeVisible();
+});
+```
+
+### Simulate Different Status Codes
+
+<Steps>
+  <Step title="Test 404 Not Found">
+    ```typescript
+    await page.route('**/api/user/999', (route) => {
+      route.fulfill({
+        status: 404,
+        body: JSON.stringify({ error: 'User not found' }),
+      });
+    });
+    ```
+  </Step>
+
+  <Step title="Test 500 Server Error">
+    ```typescript
+    await page.route('**/api/data', (route) => {
+      route.fulfill({
+        status: 500,
+        body: JSON.stringify({ error: 'Internal server error' }),
+      });
+    });
+    ```
+  </Step>
+
+  <Step title="Test 401 Unauthorized">
+    ```typescript
+    await page.route('**/api/protected', (route) => {
+      route.fulfill({
+        status: 401,
+        body: JSON.stringify({ error: 'Unauthorized' }),
+      });
+    });
+    ```
+  </Step>
+</Steps>
+
+## Advanced Mocking Patterns
+
+### Mock Browser APIs
+
+Mock browser APIs like Battery, Geolocation, or FileSystem using `page.addInitScript()`:
+
+```javascript
+const { test, expect } = require('@playwright/test');
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const mockBattery = {
+      level: 0.90,
+      charging: true,
+      chargingTime: 1800,
+      dischargingTime: Infinity,
+      addEventListener: () => { }
+    };
+    
+    delete window.navigator.battery;
+    window.navigator.getBattery = async () => mockBattery;
+  });
+});
+
+test('show battery status', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.battery-percentage')).toHaveText('90%');
+  await expect(page.locator('.battery-status')).toHaveText('Adapter');
+});
+```
+
+### Context-Wide Route Handlers
+
+Apply routes at the context level for consistent mocking across all pages:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('mock analytics across pages', async ({ context, page }) => {
+  // Apply to all pages in context
+  await context.route('**/analytics/**', (route) => route.abort());
+  
+  await page.goto('https://example.com/page1');
+  await page.goto('https://example.com/page2');
+  // Analytics blocked on both pages
+});
+```
+
+### Conditional Mocking
+
+```typescript
+await page.route('**/api/data', async (route) => {
+  const url = new URL(route.request().url());
+  const id = url.searchParams.get('id');
+  
+  if (id === '1') {
+    await route.fulfill({
+      status: 200,
+      body: JSON.stringify({ id: 1, name: 'Premium User' }),
+    });
+  } else {
+    // Let other requests pass through
+    await route.continue();
+  }
+});
+```
+
+## Unrouting
+
+Remove route handlers when they're no longer needed:
+
+```typescript
+const handler = (route) => route.fulfill({ body: 'mocked' });
+
+await page.route('**/api/data', handler);
+// ... perform some tests ...
+
+// Remove specific handler
+await page.unroute('**/api/data', handler);
+
+// Remove all handlers for pattern
+await page.unroute('**/api/data');
+```
+
+## Real-World Example
+
+Here's a complete example from the Playwright repository that tests GitHub API:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({
+  baseURL: 'https://api.github.com',
+  extraHTTPHeaders: {
+    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': `token ${process.env.API_TOKEN}`,
+  }
+});
+
+test('create bug report', async ({ request }) => {
+  const newIssue = await request.post(
+    `/repos/${process.env.GITHUB_USER}/test-repo/issues`, 
+    {
+      data: {
+        title: '[Bug] report 1',
+        body: 'Bug description',
+      }
+    }
+  );
+  expect(newIssue.ok()).toBeTruthy();
+
+  const issues = await request.get(
+    `/repos/${process.env.GITHUB_USER}/test-repo/issues`
+  );
+  expect(await issues.json()).toContainEqual(
+    expect.objectContaining({
+      title: '[Bug] report 1',
+      body: 'Bug description'
+    })
+  );
+});
+```
+
+## Best Practices
+
+<Tip>
+  **Use route.fetch()**: When you need to modify responses, use `route.fetch()` to get the original response and then modify it, ensuring realistic behavior.
+</Tip>
+
+- **Mock at the right level**: Mock at the context level for shared behavior, page level for specific tests
+- **Keep mocks realistic**: Ensure mocked responses match the actual API structure
+- **Test error scenarios**: Use mocking to test edge cases like network failures and error responses
+- **Avoid over-mocking**: Only mock what's necessary; let real requests through when possible
+- **Clean up routes**: Unroute handlers when they're no longer needed
+
+<Warning>
+  Route handlers are called in reverse order of registration. The last registered handler is called first.
+</Warning>
+
+## Troubleshooting
+
+### Routes not matching
+
+Ensure your pattern matches the full URL:
+
+```typescript
+// Log requests to debug pattern matching
+await page.route('**/*', (route) => {
+  console.log('Request:', route.request().url());
+  route.continue();
+});
+```
+
+### CORS issues with mocked responses
+
+Include proper CORS headers in mocked responses:
+
+```typescript
+await route.fulfill({
+  status: 200,
+  headers: {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE',
+  },
+  body: JSON.stringify({ data: 'value' }),
+});
+```

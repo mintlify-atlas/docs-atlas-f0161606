@@ -1,0 +1,256 @@
+---
+title: Browser
+description: API reference for the Browser class - manage browser instances
+---
+
+Browser represents a browser instance that can contain multiple isolated browser contexts.
+
+## Inheritance
+
+Extends: `ChannelOwner`
+
+Implements: `EventEmitter`
+
+## Events
+
+- `disconnected`: Emitted when browser disconnects
+
+## Methods
+
+### browserType
+
+Returns the browser type that was used to launch this browser.
+
+```typescript
+browserType(): BrowserType
+```
+
+**Returns:** `BrowserType` - The browser type (chromium, firefox, or webkit)
+
+### newContext
+
+Creates a new browser context.
+
+```typescript
+newContext(options?: BrowserContextOptions): Promise<BrowserContext>
+```
+
+<ParamField path="options" type="BrowserContextOptions" optional>
+  Context configuration options
+  
+  - `viewport` (object | null): Viewport size
+  - `userAgent` (string): User agent string
+  - `locale` (string): Locale (e.g., 'en-US')
+  - `timezoneId` (string): Timezone (e.g., 'America/New_York')
+  - `permissions` (string[]): Granted permissions
+  - `geolocation` (object): Geolocation { latitude, longitude, accuracy }
+  - `colorScheme` ('light' | 'dark' | 'no-preference'): Color scheme
+  - `extraHTTPHeaders` (object): Extra HTTP headers
+  - `offline` (boolean): Emulate network offline
+  - `httpCredentials` (object): HTTP credentials { username, password }
+  - `deviceScaleFactor` (number): Device scale factor
+  - `isMobile` (boolean): Whether to emulate mobile device
+  - `hasTouch` (boolean): Whether to support touch events
+  - `storageState` (string | object): Storage state to initialize context with
+</ParamField>
+
+**Returns:** `Promise<BrowserContext>` - New browser context
+
+### contexts
+
+Returns all open browser contexts.
+
+```typescript
+contexts(): BrowserContext[]
+```
+
+**Returns:** `BrowserContext[]` - Array of all browser contexts
+
+### newPage
+
+Creates a new page in a new context.
+
+```typescript
+newPage(options?: BrowserContextOptions): Promise<Page>
+```
+
+<ParamField path="options" type="BrowserContextOptions" optional>
+  Context options (same as newContext)
+</ParamField>
+
+**Returns:** `Promise<Page>` - New page in a new context
+
+**Note:** The context will be closed when the page is closed
+
+### version
+
+Returns browser version.
+
+```typescript
+version(): string
+```
+
+**Returns:** `string` - Browser version string
+
+### isConnected
+
+Indicates whether browser is connected.
+
+```typescript
+isConnected(): boolean
+```
+
+**Returns:** `boolean` - True if browser is connected
+
+### close
+
+Closes the browser and all its contexts.
+
+```typescript
+close(options?: { reason?: string }): Promise<void>
+```
+
+<ParamField path="options" type="object" optional>
+  Close options
+  
+  - `reason` (string): Optional reason for closing
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### newBrowserCDPSession
+
+Creates a new Chrome DevTools Protocol session.
+
+```typescript
+newBrowserCDPSession(): Promise<CDPSession>
+```
+
+**Returns:** `Promise<CDPSession>` - CDP session
+
+**Note:** Only available for Chromium
+
+### startTracing
+
+Starts tracing.
+
+```typescript
+startTracing(page?: Page, options?: { path?: string; screenshots?: boolean; categories?: string[] }): Promise<void>
+```
+
+<ParamField path="page" type="Page" optional>
+  Page to trace (all pages if not specified)
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  Tracing options
+  
+  - `path` (string): File path to save trace to
+  - `screenshots` (boolean): Capture screenshots
+  - `categories` (string[]): Tracing categories
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+**Note:** Only available for Chromium
+
+### stopTracing
+
+Stops tracing and returns trace data.
+
+```typescript
+stopTracing(): Promise<Buffer>
+```
+
+**Returns:** `Promise<Buffer>` - Trace data
+
+**Note:** Only available for Chromium
+
+## Usage Examples
+
+### Basic Browser Usage
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+console.log(browser.version()); // e.g., "121.0.6167.57"
+
+const context = await browser.newContext();
+const page = await context.newPage();
+
+await page.goto('https://example.com');
+
+await browser.close();
+```
+
+### Multiple Contexts
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+
+// Create multiple isolated contexts
+const context1 = await browser.newContext({ locale: 'en-US' });
+const context2 = await browser.newContext({ locale: 'de-DE' });
+
+const page1 = await context1.newPage();
+const page2 = await context2.newPage();
+
+console.log(browser.contexts().length); // 2
+
+await browser.close();
+```
+
+### Quick Page Creation
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+const page = await browser.newPage({
+  viewport: { width: 1920, height: 1080 },
+  userAgent: 'Custom User Agent',
+});
+
+await page.goto('https://example.com');
+await page.close(); // This closes the owned context too
+```
+
+### Browser Events
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+
+browser.on('disconnected', () => {
+  console.log('Browser disconnected');
+});
+
+console.log(browser.isConnected()); // true
+await browser.close();
+console.log(browser.isConnected()); // false
+```
+
+### CDP Session (Chromium)
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+const cdpSession = await browser.newBrowserCDPSession();
+
+await cdpSession.send('Performance.enable');
+const metrics = await cdpSession.send('Performance.getMetrics');
+console.log(metrics);
+
+await browser.close();
+```
+
+## Related Classes
+
+- [BrowserType](/api/browser-type) - For launching browsers
+- [BrowserContext](/api/browser-context) - Isolated browser sessions
+- [Page](/api/page) - Web pages

@@ -1,0 +1,247 @@
+---
+title: Route
+description: API reference for the Playwright Route class for intercepting and modifying network requests.
+---
+
+The Route class represents a route handler that can intercept, modify, or mock network requests. Routes are created using `page.route()` or `context.route()`.
+
+## Methods
+
+### request
+
+Returns the request associated with this route.
+
+```javascript
+const request = route.request();
+console.log(request.url());
+```
+
+**Returns:** `Request`
+
+---
+
+### abort
+
+Aborts the request.
+
+```javascript
+await route.abort();
+await route.abort('failed');
+```
+
+<ParamField path="errorCode" type="string">
+  Optional error code. Defaults to 'failed'.
+  
+  Possible values: `aborted`, `accessdenied`, `addressunreachable`, `blockedbyclient`, `blockedbyresponse`, `connectionaborted`, `connectionclosed`, `connectionfailed`, `connectionrefused`, `connectionreset`, `internetdisconnected`, `namenotresolved`, `timedout`, `failed`
+</ParamField>
+
+---
+
+### fulfill
+
+Fulfills the request with a custom response.
+
+```javascript
+await route.fulfill({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify({ success: true })
+});
+```
+
+<ParamField path="options.status" type="number">
+  Response status code. Defaults to 200.
+</ParamField>
+
+<ParamField path="options.headers" type="Object">
+  Response headers. Header values must be strings.
+</ParamField>
+
+<ParamField path="options.contentType" type="string">
+  Response content type. If not set, will be inferred from body.
+</ParamField>
+
+<ParamField path="options.body" type="string | Buffer">
+  Response body.
+</ParamField>
+
+<ParamField path="options.json" type="any">
+  JSON response body. Mutually exclusive with `body`.
+</ParamField>
+
+<ParamField path="options.path" type="string">
+  File path to read response body from.
+</ParamField>
+
+<ParamField path="options.response" type="APIResponse">
+  APIResponse to fulfill with. Status and headers will be copied from the response.
+</ParamField>
+
+---
+
+### continue
+
+Continues the request with optional modifications.
+
+```javascript
+await route.continue();
+await route.continue({
+  headers: {
+    ...route.request().headers(),
+    'Authorization': 'Bearer token'
+  }
+});
+```
+
+<ParamField path="options.url" type="string">
+  Override request URL.
+</ParamField>
+
+<ParamField path="options.method" type="string">
+  Override request method (GET, POST, etc.).
+</ParamField>
+
+<ParamField path="options.headers" type="Object">
+  Override request headers.
+</ParamField>
+
+<ParamField path="options.postData" type="string | Buffer | object">
+  Override request post data.
+</ParamField>
+
+---
+
+### fallback
+
+Falls back to the next route handler or default behavior.
+
+```javascript
+await route.fallback();
+await route.fallback({
+  headers: {
+    ...route.request().headers(),
+    'X-Custom': 'value'
+  }
+});
+```
+
+<ParamField path="options.url" type="string">
+  Override request URL.
+</ParamField>
+
+<ParamField path="options.method" type="string">
+  Override request method.
+</ParamField>
+
+<ParamField path="options.headers" type="Object">
+  Override request headers.
+</ParamField>
+
+<ParamField path="options.postData" type="string | Buffer | object">
+  Override request post data.
+</ParamField>
+
+---
+
+### fetch
+
+Fetches the original request and returns the response.
+
+```javascript
+const response = await route.fetch();
+const body = await response.text();
+await route.fulfill({ body: body.replace('old', 'new') });
+```
+
+<ParamField path="options.url" type="string">
+  Override request URL.
+</ParamField>
+
+<ParamField path="options.method" type="string">
+  Override request method.
+</ParamField>
+
+<ParamField path="options.headers" type="Object">
+  Override request headers.
+</ParamField>
+
+<ParamField path="options.postData" type="string | Buffer | object">
+  Override request post data.
+</ParamField>
+
+<ParamField path="options.maxRedirects" type="number">
+  Maximum number of redirects to follow. Defaults to 20.
+</ParamField>
+
+<ParamField path="options.maxRetries" type="number">
+  Maximum number of retries. Defaults to 0.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Request timeout in milliseconds.
+</ParamField>
+
+**Returns:** `Promise<APIResponse>`
+
+## Example Usage
+
+### Mock API Response
+
+```javascript
+await page.route('**/api/users', route => {
+  route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify([
+      { id: 1, name: 'John' },
+      { id: 2, name: 'Jane' }
+    ])
+  });
+});
+```
+
+### Block Images
+
+```javascript
+await page.route('**/*.{png,jpg,jpeg}', route => route.abort());
+```
+
+### Modify Request Headers
+
+```javascript
+await page.route('**/api/**', route => {
+  const headers = route.request().headers();
+  route.continue({
+    headers: {
+      ...headers,
+      'Authorization': 'Bearer my-token'
+    }
+  });
+});
+```
+
+### Modify Response
+
+```javascript
+await page.route('**/api/data', async route => {
+  const response = await route.fetch();
+  const json = await response.json();
+  json.modified = true;
+  await route.fulfill({
+    response,
+    json
+  });
+});
+```
+
+### Conditional Routing
+
+```javascript
+await page.route('**/api/**', route => {
+  if (route.request().method() === 'POST') {
+    route.continue();
+  } else {
+    route.abort();
+  }
+});
+```

@@ -1,0 +1,316 @@
+---
+title: Request
+description: API reference for the Playwright Request class for handling network requests.
+---
+
+The Request class represents network requests made by pages. Whenever a page makes a request, the following events are emitted:
+- `page.on('request')` - emitted when the request is issued
+- `page.on('response')` - emitted when the response is received
+
+## Methods
+
+### url
+
+Returns the URL of the request.
+
+```javascript
+const url = request.url();
+console.log(url);
+```
+
+**Returns:** `string`
+
+---
+
+### resourceType
+
+Returns the resource type of the request.
+
+```javascript
+const type = request.resourceType();
+console.log(type); // 'document', 'stylesheet', 'image', 'script', etc.
+```
+
+**Returns:** `string`
+
+Possible values: `document`, `stylesheet`, `image`, `media`, `font`, `script`, `texttrack`, `xhr`, `fetch`, `eventsource`, `websocket`, `manifest`, `other`
+
+---
+
+### method
+
+Returns the HTTP method of the request.
+
+```javascript
+const method = request.method();
+console.log(method); // 'GET', 'POST', etc.
+```
+
+**Returns:** `string`
+
+---
+
+### postData
+
+Returns the request's post data as a string.
+
+```javascript
+const data = request.postData();
+console.log(data);
+```
+
+**Returns:** `string | null`
+
+---
+
+### postDataBuffer
+
+Returns the request's post data as a Buffer.
+
+```javascript
+const buffer = request.postDataBuffer();
+console.log(buffer);
+```
+
+**Returns:** `Buffer | null`
+
+---
+
+### postDataJSON
+
+Parses the request's post data as JSON.
+
+```javascript
+const json = request.postDataJSON();
+console.log(json);
+```
+
+**Returns:** `Object | null`
+
+Automatically handles both JSON and form-encoded data.
+
+---
+
+### headers
+
+Returns the request headers.
+
+```javascript
+const headers = request.headers();
+console.log(headers['content-type']);
+```
+
+**Returns:** `Object`
+
+<Warning>
+  This method returns provisional headers. Use `allHeaders()` for actual headers sent over the network.
+</Warning>
+
+---
+
+### allHeaders
+
+Returns all request headers.
+
+```javascript
+const headers = await request.allHeaders();
+console.log(headers);
+```
+
+**Returns:** `Promise<Object>`
+
+---
+
+### headersArray
+
+Returns the request headers as an array of objects.
+
+```javascript
+const headers = await request.headersArray();
+console.log(headers); // [{ name: 'content-type', value: 'application/json' }, ...]
+```
+
+**Returns:** `Promise<Array<{name: string, value: string}>>`
+
+---
+
+### headerValue
+
+Returns the value of a specific header.
+
+```javascript
+const contentType = await request.headerValue('content-type');
+console.log(contentType);
+```
+
+<ParamField path="name" type="string" required>
+  The header name (case-insensitive)
+</ParamField>
+
+**Returns:** `Promise<string | null>`
+
+---
+
+### response
+
+Returns the response for this request.
+
+```javascript
+const response = await request.response();
+if (response) {
+  console.log(response.status());
+}
+```
+
+**Returns:** `Promise<Response | null>`
+
+---
+
+### frame
+
+Returns the frame that initiated the request.
+
+```javascript
+const frame = request.frame();
+console.log(frame.url());
+```
+
+**Returns:** `Frame`
+
+<Note>
+  Throws an error for service worker requests.
+</Note>
+
+---
+
+### isNavigationRequest
+
+Returns whether this is a navigation request.
+
+```javascript
+if (request.isNavigationRequest()) {
+  console.log('Navigation request to:', request.url());
+}
+```
+
+**Returns:** `boolean`
+
+---
+
+### redirectedFrom
+
+Returns the request that was redirected to this request.
+
+```javascript
+const previous = request.redirectedFrom();
+if (previous) {
+  console.log('Redirected from:', previous.url());
+}
+```
+
+**Returns:** `Request | null`
+
+---
+
+### redirectedTo
+
+Returns the request that this request was redirected to.
+
+```javascript
+const next = request.redirectedTo();
+if (next) {
+  console.log('Redirected to:', next.url());
+}
+```
+
+**Returns:** `Request | null`
+
+---
+
+### failure
+
+Returns error details if the request failed.
+
+```javascript
+const failure = request.failure();
+if (failure) {
+  console.log('Request failed:', failure.errorText);
+}
+```
+
+**Returns:** `{errorText: string} | null`
+
+---
+
+### timing
+
+Returns timing information for the request.
+
+```javascript
+const timing = request.timing();
+console.log('Request start:', timing.requestStart);
+console.log('Response end:', timing.responseEnd);
+```
+
+**Returns:** `Object`
+
+Returned object properties:
+- `startTime`: number
+- `domainLookupStart`: number
+- `domainLookupEnd`: number
+- `connectStart`: number
+- `secureConnectionStart`: number
+- `connectEnd`: number
+- `requestStart`: number
+- `responseStart`: number
+- `responseEnd`: number
+
+---
+
+### sizes
+
+Returns sizes information for the request.
+
+```javascript
+const sizes = await request.sizes();
+console.log('Request body size:', sizes.requestBodySize);
+console.log('Response body size:', sizes.responseBodySize);
+```
+
+**Returns:** `Promise<Object>`
+
+Returned object properties:
+- `requestBodySize`: number
+- `requestHeadersSize`: number
+- `responseBodySize`: number
+- `responseHeadersSize`: number
+
+## Example Usage
+
+### Monitor API Requests
+
+```javascript
+page.on('request', request => {
+  if (request.resourceType() === 'fetch' || request.resourceType() === 'xhr') {
+    console.log('API Request:', request.method(), request.url());
+  }
+});
+```
+
+### Log Failed Requests
+
+```javascript
+page.on('requestfailed', request => {
+  const failure = request.failure();
+  console.log('Failed:', request.url(), failure?.errorText);
+});
+```
+
+### Inspect Request Headers
+
+```javascript
+page.on('request', async request => {
+  const headers = await request.allHeaders();
+  console.log('Request headers:', headers);
+});
+```

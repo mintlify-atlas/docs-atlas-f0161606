@@ -1,0 +1,381 @@
+---
+title: Browsers
+description: Understanding browser types, launching browsers, and managing browser instances
+---
+
+## Browser Types
+
+Playwright supports three browser engines out of the box:
+
+<CardGroup cols={3}>
+  <Card title="Chromium" icon="chrome">
+    Google Chrome and Microsoft Edge
+  </Card>
+  <Card title="Firefox" icon="firefox">
+    Mozilla Firefox
+  </Card>
+  <Card title="WebKit" icon="safari">
+    Apple Safari
+  </Card>
+</CardGroup>
+
+## Launching Browsers
+
+### Basic Launch
+
+```javascript
+const { chromium, firefox, webkit } = require('playwright');
+
+// Launch Chromium
+const browser = await chromium.launch();
+
+// Launch Firefox
+const browser = await firefox.launch();
+
+// Launch WebKit
+const browser = await webkit.launch();
+```
+
+### Launch Options
+
+```javascript
+const browser = await chromium.launch({
+  headless: false,           // Run in headed mode
+  slowMo: 100,              // Slow down by 100ms
+  devtools: true,           // Open DevTools
+  args: ['--start-maximized'],  // Browser arguments
+  executablePath: '/path/to/chrome'  // Custom browser binary
+});
+```
+
+<Note>
+From server/browserType.ts:66, the `launch()` method validates options and manages the browser process lifecycle.
+</Note>
+
+## Browser Class
+
+The `Browser` class (client/browser.ts:31) represents a running browser instance:
+
+```typescript
+export class Browser extends ChannelOwner<channels.BrowserChannel> {
+  readonly _contexts = new Set<BrowserContext>();
+  private _isConnected = true;
+  readonly _name: string;
+  
+  async newContext(options: BrowserContextOptions = {}): Promise<BrowserContext> {
+    // Creates isolated browser context
+  }
+  
+  async newPage(options: BrowserContextOptions = {}): Promise<Page> {
+    // Shortcut: creates context + page
+  }
+  
+  contexts(): BrowserContext[] {
+    return [...this._contexts];
+  }
+  
+  version(): string {
+    return this._initializer.version;
+  }
+  
+  async close(): Promise<void> {
+    // Closes browser and all contexts
+  }
+}
+```
+
+## Browser Lifecycle
+
+<Steps>
+  <Step title="Launch">
+    Browser process starts
+    
+    ```javascript
+    const browser = await chromium.launch();
+    ```
+  </Step>
+  
+  <Step title="Create Contexts">
+    Multiple isolated sessions
+    
+    ```javascript
+    const context1 = await browser.newContext();
+    const context2 = await browser.newContext();
+    ```
+  </Step>
+  
+  <Step title="Use Browser">
+    Perform automation tasks
+  </Step>
+  
+  <Step title="Close">
+    Clean up resources
+    
+    ```javascript
+    await browser.close();
+    ```
+  </Step>
+</Steps>
+
+## Browser Connection State
+
+```javascript
+// Check if browser is connected
+if (browser.isConnected()) {
+  console.log('Browser is running');
+}
+
+// Listen for disconnection
+browser.on('disconnected', () => {
+  console.log('Browser closed');
+});
+```
+
+From client/browser.ts:147-194:
+
+```typescript
+isConnected(): boolean {
+  return this._isConnected;
+}
+
+_didClose() {
+  this._isConnected = false;
+  this.emit(Events.Browser.Disconnected, this);
+}
+```
+
+## Browser Properties
+
+### Version Information
+
+```javascript
+const version = browser.version();
+console.log(`Browser version: ${version}`);
+```
+
+### Browser Type
+
+```javascript
+const browserType = browser.browserType();
+console.log(`Browser name: ${browserType.name()}`);
+```
+
+## Multiple Contexts Pattern
+
+Browsers can host multiple independent contexts, which is much more efficient than launching multiple browsers:
+
+```javascript
+const browser = await chromium.launch();
+
+// User 1 session
+const context1 = await browser.newContext({
+  viewport: { width: 1920, height: 1080 },
+  userAgent: 'Custom User Agent 1'
+});
+
+// User 2 session (completely isolated)
+const context2 = await browser.newContext({
+  viewport: { width: 1280, height: 720 },
+  userAgent: 'Custom User Agent 2'
+});
+
+// Contexts don't share cookies, storage, or cache
+await Promise.all([
+  context1.newPage().then(page => page.goto('https://example.com')),
+  context2.newPage().then(page => page.goto('https://example.com'))
+]);
+```
+
+<Warning>
+Always close browsers to prevent resource leaks. Unclosed browsers continue running in the background.
+</Warning>
+
+## Persistent Context
+
+Launch a browser with persistent storage (user data directory):
+
+```javascript
+const context = await chromium.launchPersistentContext('./user-data', {
+  headless: false,
+  viewport: { width: 1280, height: 720 }
+});
+
+// This context persists cookies, localStorage, etc.
+const page = await context.newPage();
+await page.goto('https://example.com');
+
+// Login state is saved for next time
+await context.close();
+```
+
+From server/browserType.ts:74:
+
+```typescript
+async launchPersistentContext(
+  progress: Progress,
+  userDataDir: string,
+  options: BrowserTypeLaunchPersistentContextOptions
+): Promise<BrowserContext>
+```
+
+## Remote Browser Connection
+
+Connect to a browser running on another machine:
+
+```javascript
+const browser = await chromium.connect({
+  wsEndpoint: 'ws://remote-server:3000'
+});
+
+// Use as normal
+const context = await browser.newContext();
+const page = await context.newPage();
+```
+
+## Browser Server
+
+Start a browser server for remote connections:
+
+```javascript
+const browserServer = await chromium.launchServer({
+  port: 3000
+});
+
+console.log(`Connect to: ${browserServer.wsEndpoint()}`);
+
+// Remote clients can now connect
+// ...
+
+await browserServer.close();
+```
+
+## CDP Session (Chromium Only)
+
+Access Chrome DevTools Protocol directly:
+
+```javascript
+const browser = await chromium.launch();
+
+// Browser-level CDP session
+const cdpSession = await browser.newBrowserCDPSession();
+
+// Send CDP commands
+await cdpSession.send('Performance.enable');
+const metrics = await cdpSession.send('Performance.getMetrics');
+
+await cdpSession.detach();
+```
+
+From client/browser.ts:151:
+
+```typescript
+async newBrowserCDPSession(): Promise<api.CDPSession> {
+  return CDPSession.from((await this._channel.newBrowserCDPSession()).session);
+}
+```
+
+## Error Handling
+
+```javascript
+try {
+  const browser = await chromium.launch({
+    executablePath: '/invalid/path'
+  });
+} catch (error) {
+  if (error.message.includes('Failed to launch')) {
+    console.error('Browser failed to start');
+  }
+}
+```
+
+## Browser Process Management
+
+Playwright automatically manages browser processes:
+
+1. **Process Launch** - Starts browser with appropriate flags
+2. **Connection Setup** - Establishes WebSocket or pipe communication
+3. **Protocol Initialization** - Sets up CDP/Juggler/Inspector protocol
+4. **Context Management** - Tracks all browser contexts
+5. **Cleanup** - Terminates browser process on close
+
+From server/browserType.ts, the browser launch flow includes:
+- Option validation
+- Executable path resolution
+- Process spawning
+- Connection establishment
+- Protocol handshake
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Reuse Browsers Across Tests">
+    Launch once, create multiple contexts. Contexts are lightweight.
+    
+    ```javascript
+    // Good
+    const browser = await chromium.launch();
+    for (let i = 0; i < 10; i++) {
+      const context = await browser.newContext();
+      // ... test ...
+      await context.close();
+    }
+    await browser.close();
+    ```
+  </Accordion>
+  
+  <Accordion title="Always Close Resources">
+    Use try-finally or async disposal to ensure cleanup.
+    
+    ```javascript
+    const browser = await chromium.launch();
+    try {
+      // ... use browser ...
+    } finally {
+      await browser.close();
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Browser Crashes">
+    Listen for disconnection events.
+    
+    ```javascript
+    browser.on('disconnected', () => {
+      console.log('Browser crashed or was closed');
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Browser Arguments
+
+Customize browser behavior with command-line arguments:
+
+```javascript
+const browser = await chromium.launch({
+  args: [
+    '--disable-web-security',
+    '--disable-features=IsolateOrigins,site-per-process',
+    '--no-sandbox',
+    '--disable-setuid-sandbox'
+  ]
+});
+```
+
+<Warning>
+Disabling security features is dangerous. Only use in controlled test environments.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Browser Contexts" icon="window-restore" href="./browser-contexts">
+    Learn about isolated browser sessions
+  </Card>
+  <Card title="Pages and Frames" icon="file" href="./pages-and-frames">
+    Working with tabs and iframes
+  </Card>
+  <Card title="Test Isolation" icon="shield" href="./test-isolation">
+    Ensuring test independence
+  </Card>
+</CardGroup>

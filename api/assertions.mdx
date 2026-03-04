@@ -1,0 +1,701 @@
+---
+title: Assertions
+description: API reference for Playwright Test assertions and matchers
+---
+
+Playwright Test includes built-in matchers for making assertions about page state, locators, and API responses. All assertions automatically retry until the expected condition is met.
+
+## Locator Assertions
+
+### toBeAttached
+
+Asserts that an element is attached to the DOM.
+
+```typescript
+await expect(locator).toBeAttached();
+await expect(locator).toBeAttached({ attached: false });
+```
+
+<ParamField path="options.attached" type="boolean" default="true">
+  Whether to assert that element is attached or detached.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeChecked
+
+Asserts that a checkbox or radio button is checked.
+
+```typescript
+await expect(locator).toBeChecked();
+await expect(locator).toBeChecked({ checked: false });
+await expect(locator).toBeChecked({ indeterminate: true });
+```
+
+<ParamField path="options.checked" type="boolean">
+  Whether to assert that element is checked or unchecked.
+</ParamField>
+
+<ParamField path="options.indeterminate" type="boolean">
+  Whether to assert that element is in indeterminate state.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeDisabled
+
+Asserts that an element is disabled.
+
+```typescript
+await expect(locator).toBeDisabled();
+```
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeEditable
+
+Asserts that an element is editable.
+
+```typescript
+await expect(locator).toBeEditable();
+await expect(locator).toBeEditable({ editable: false });
+```
+
+<ParamField path="options.editable" type="boolean" default="true">
+  Whether to assert that element is editable or readonly.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeEmpty
+
+Asserts that an element contains no text content or child elements.
+
+```typescript
+await expect(locator).toBeEmpty();
+```
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeEnabled
+
+Asserts that an element is enabled.
+
+```typescript
+await expect(locator).toBeEnabled();
+await expect(locator).toBeEnabled({ enabled: false });
+```
+
+<ParamField path="options.enabled" type="boolean" default="true">
+  Whether to assert that element is enabled or disabled.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeFocused
+
+Asserts that an element has focus.
+
+```typescript
+await expect(locator).toBeFocused();
+```
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeHidden
+
+Asserts that an element is not visible.
+
+```typescript
+await expect(locator).toBeHidden();
+```
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeVisible
+
+Asserts that an element is visible.
+
+```typescript
+await expect(locator).toBeVisible();
+await expect(locator).toBeVisible({ visible: false });
+```
+
+<ParamField path="options.visible" type="boolean" default="true">
+  Whether to assert that element is visible or hidden.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toBeInViewport
+
+Asserts that an element is within the viewport.
+
+```typescript
+await expect(locator).toBeInViewport();
+await expect(locator).toBeInViewport({ ratio: 0.5 });
+```
+
+<ParamField path="options.ratio" type="number">
+  The minimum ratio of the element to be considered in viewport. Defaults to any positive ratio.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toContainText
+
+Asserts that an element contains the specified text.
+
+```typescript
+await expect(locator).toContainText('substring');
+await expect(locator).toContainText(/pattern/);
+await expect(locator).toContainText(['text1', 'text2']);
+```
+
+<ParamField path="expected" type="string | RegExp | Array<string | RegExp>" required>
+  Expected substring, pattern, or array of expected text values.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.useInnerText" type="boolean">
+  Whether to use `innerText` instead of `textContent`.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+### toHaveAccessibleDescription
+
+Asserts that an element has the specified accessible description.
+
+```typescript
+await expect(locator).toHaveAccessibleDescription('Button description');
+await expect(locator).toHaveAccessibleDescription(/description/);
+```
+
+<ParamField path="expected" type="string | RegExp" required>
+  Expected accessible description.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+### toHaveAccessibleName
+
+Asserts that an element has the specified accessible name.
+
+```typescript
+await expect(locator).toHaveAccessibleName('Submit button');
+await expect(locator).toHaveAccessibleName(/submit/i);
+```
+
+<ParamField path="expected" type="string | RegExp" required>
+  Expected accessible name.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+### toHaveAccessibleErrorMessage
+
+Asserts that an element has the specified accessible error message.
+
+```typescript
+await expect(locator).toHaveAccessibleErrorMessage('Field is required');
+```
+
+<ParamField path="expected" type="string | RegExp" required>
+  Expected accessible error message.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+### toHaveAttribute
+
+Asserts that an element has the specified attribute.
+
+```typescript
+// Check attribute exists
+await expect(locator).toHaveAttribute('disabled');
+
+// Check attribute value
+await expect(locator).toHaveAttribute('href', '/about');
+await expect(locator).toHaveAttribute('class', /primary/);
+```
+
+<ParamField path="name" type="string" required>
+  Attribute name.
+</ParamField>
+
+<ParamField path="value" type="string | RegExp">
+  Expected attribute value.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+### toHaveClass
+
+Asserts that an element has the specified CSS class.
+
+```typescript
+await expect(locator).toHaveClass('active');
+await expect(locator).toHaveClass(/btn-/);
+await expect(locator).toHaveClass(['btn', 'btn-primary']);
+```
+
+<ParamField path="expected" type="string | RegExp | Array<string | RegExp>" required>
+  Expected CSS class or array of classes.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toContainClass
+
+Asserts that an element's class attribute contains the specified class.
+
+```typescript
+await expect(locator).toContainClass('highlight');
+await expect(locator).toContainClass(['active', 'selected']);
+```
+
+<ParamField path="expected" type="string | string[]" required>
+  Expected CSS class name or array of class names. RegExp is not supported.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toHaveCount
+
+Asserts that a locator matches the specified number of elements.
+
+```typescript
+await expect(page.locator('.item')).toHaveCount(5);
+```
+
+<ParamField path="count" type="number" required>
+  Expected number of elements.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toHaveCSS
+
+Asserts that an element has the specified CSS property.
+
+```typescript
+// Single property
+await expect(locator).toHaveCSS('color', 'rgb(255, 0, 0)');
+await expect(locator).toHaveCSS('font-size', /16px/);
+
+// Multiple properties
+await expect(locator).toHaveCSS({ color: 'red', display: 'flex' });
+```
+
+<ParamField path="name" type="string">
+  CSS property name.
+</ParamField>
+
+<ParamField path="value" type="string | RegExp">
+  Expected CSS property value.
+</ParamField>
+
+<ParamField path="styles" type="Record<string, string>">
+  Object with CSS property names and their expected values.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toHaveId
+
+Asserts that an element has the specified ID.
+
+```typescript
+await expect(locator).toHaveId('submit-button');
+await expect(locator).toHaveId(/^btn-/);
+```
+
+<ParamField path="id" type="string | RegExp" required>
+  Expected element ID.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toHaveJSProperty
+
+Asserts that an element has the specified JavaScript property.
+
+```typescript
+await expect(locator).toHaveJSProperty('loaded', true);
+await expect(locator).toHaveJSProperty('value', 42);
+```
+
+<ParamField path="name" type="string" required>
+  Property name.
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  Expected property value.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toHaveRole
+
+Asserts that an element has the specified ARIA role.
+
+```typescript
+await expect(locator).toHaveRole('button');
+```
+
+<ParamField path="role" type="string" required>
+  Expected ARIA role.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+### toHaveText
+
+Asserts that an element has the specified text.
+
+```typescript
+await expect(locator).toHaveText('Welcome');
+await expect(locator).toHaveText(/welcome/i);
+await expect(locator).toHaveText(['Item 1', 'Item 2', 'Item 3']);
+```
+
+<ParamField path="text" type="string | RegExp | Array<string | RegExp>" required>
+  Expected text or array of text values.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.useInnerText" type="boolean">
+  Whether to use `innerText` instead of `textContent`.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+### toHaveValue
+
+Asserts that an input element has the specified value.
+
+```typescript
+await expect(locator).toHaveValue('John Doe');
+await expect(locator).toHaveValue(/^john/i);
+```
+
+<ParamField path="value" type="string | RegExp" required>
+  Expected input value.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toHaveValues
+
+Asserts that a multi-select element has the specified values.
+
+```typescript
+await expect(locator).toHaveValues(['option1', 'option2']);
+await expect(locator).toHaveValues([/opt-1/, /opt-2/]);
+```
+
+<ParamField path="values" type="Array<string | RegExp>" required>
+  Expected array of selected values.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+## Page Assertions
+
+### toHaveTitle
+
+Asserts that the page has the specified title.
+
+```typescript
+await expect(page).toHaveTitle('Home Page');
+await expect(page).toHaveTitle(/dashboard/i);
+```
+
+<ParamField path="title" type="string | RegExp" required>
+  Expected page title.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+### toHaveURL
+
+Asserts that the page has the specified URL.
+
+```typescript
+await expect(page).toHaveURL('https://example.com');
+await expect(page).toHaveURL(/.*\/dashboard/);
+await expect(page).toHaveURL(url => url.searchParams.get('page') === '2');
+```
+
+<ParamField path="url" type="string | RegExp | URLPattern | (url: URL) => boolean" required>
+  Expected URL string, pattern, URLPattern, or predicate function.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.ignoreCase" type="boolean">
+  Whether to perform case-insensitive match.
+</ParamField>
+
+## API Response Assertions
+
+### toBeOK
+
+Asserts that an API response has a successful status code (200-299).
+
+```typescript
+const response = await page.request.get('https://api.example.com/users');
+await expect(response).toBeOK();
+```
+
+## Snapshot Assertions
+
+### toHaveScreenshot
+
+Asserts that a page or locator screenshot matches the stored snapshot.
+
+```typescript
+await expect(page).toHaveScreenshot('homepage.png');
+await expect(locator).toHaveScreenshot('button.png');
+await expect(page).toHaveScreenshot('modal.png', {
+  mask: [page.locator('.dynamic-content')],
+  maxDiffPixels: 100
+});
+```
+
+<ParamField path="name" type="string | string[]">
+  Snapshot name or path segments.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+<ParamField path="options.animations" type="'disabled' | 'allow'">
+  How to handle CSS animations.
+</ParamField>
+
+<ParamField path="options.caret" type="'hide' | 'initial'">
+  Whether to hide the text caret.
+</ParamField>
+
+<ParamField path="options.clip" type="{ x: number, y: number, width: number, height: number }">
+  Area to capture.
+</ParamField>
+
+<ParamField path="options.fullPage" type="boolean">
+  Whether to take a full page screenshot.
+</ParamField>
+
+<ParamField path="options.mask" type="Locator[]">
+  Elements to mask before taking the screenshot.
+</ParamField>
+
+<ParamField path="options.maskColor" type="string">
+  Color to use for masking.
+</ParamField>
+
+<ParamField path="options.maxDiffPixels" type="number">
+  Maximum number of differing pixels allowed.
+</ParamField>
+
+<ParamField path="options.maxDiffPixelRatio" type="number">
+  Maximum ratio of differing pixels (0-1).
+</ParamField>
+
+<ParamField path="options.threshold" type="number">
+  Color difference threshold (0-1).
+</ParamField>
+
+### toMatchSnapshot
+
+Asserts that a value matches the stored snapshot.
+
+```typescript
+await expect(screenshot).toMatchSnapshot('reference.png');
+await expect(data).toMatchSnapshot('data.json');
+```
+
+<ParamField path="name" type="string | string[]">
+  Snapshot name or path segments.
+</ParamField>
+
+<ParamField path="options.maxDiffPixels" type="number">
+  Maximum number of differing pixels allowed (for images).
+</ParamField>
+
+<ParamField path="options.maxDiffPixelRatio" type="number">
+  Maximum ratio of differing pixels (0-1, for images).
+</ParamField>
+
+<ParamField path="options.threshold" type="number">
+  Color difference threshold (0-1, for images).
+</ParamField>
+
+### toMatchAriaSnapshot
+
+Asserts that the accessibility tree matches the expected snapshot.
+
+```typescript
+await expect(page.locator('body')).toMatchAriaSnapshot(`
+  - banner:
+    - heading "Welcome" [level=1]
+  - main:
+    - button "Sign up"
+`);
+```
+
+<ParamField path="snapshot" type="string">
+  Expected ARIA snapshot in YAML format.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to wait for the assertion to pass.
+</ParamField>
+
+## Generic Assertions
+
+### toPass
+
+Retries a callback until it passes without throwing an error.
+
+```typescript
+await expect(async () => {
+  const response = await page.request.get('https://api.example.com/status');
+  expect(response.status()).toBe(200);
+}).toPass();
+```
+
+<ParamField path="callback" type="() => void | Promise<void>" required>
+  Function to retry until it passes.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to retry.
+</ParamField>
+
+<ParamField path="options.intervals" type="number[]">
+  Retry intervals in milliseconds.
+</ParamField>
+
+## Negation
+
+All matchers can be negated using `.not`:
+
+```typescript
+await expect(locator).not.toBeVisible();
+await expect(page).not.toHaveURL('/login');
+```
+
+## Soft Assertions
+
+Soft assertions don't terminate test execution:
+
+```typescript
+await expect.soft(locator).toBeVisible();
+await expect.soft(page).toHaveTitle('Expected Title');
+```
+
+## Polling
+
+Poll a function and make assertions on its return value:
+
+```typescript
+await expect.poll(async () => {
+  const response = await page.request.get('https://api.example.com/data');
+  return response.status();
+}).toBe(200);
+```
+
+<ParamField path="callback" type="() => any" required>
+  Function to poll.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds to poll.
+</ParamField>
+
+<ParamField path="options.intervals" type="number[]">
+  Polling intervals in milliseconds.
+</ParamField>

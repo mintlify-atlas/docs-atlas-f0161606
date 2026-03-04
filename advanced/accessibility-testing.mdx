@@ -1,0 +1,486 @@
+---
+title: "Accessibility Testing"
+description: "Test web accessibility with Playwright's built-in tools and integrations"
+---
+
+## Overview
+
+Accessibility testing ensures your web application is usable by people with disabilities. Playwright provides built-in accessibility features and integrations with popular accessibility testing libraries.
+
+## Accessibility Snapshot
+
+Playwright provides an accessibility tree snapshot API to inspect the semantic structure of your page.
+
+<CodeGroup>
+```typescript Basic Snapshot
+import { test, expect } from '@playwright/test';
+
+test('get accessibility snapshot', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const snapshot = await page.accessibility.snapshot();
+  console.log(JSON.stringify(snapshot, null, 2));
+});
+```
+
+```typescript Snapshot with Root Element
+import { test } from '@playwright/test';
+
+test('snapshot specific element', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const navigation = page.locator('nav');
+  const snapshot = await page.accessibility.snapshot({
+    root: navigation,
+  });
+  
+  console.log(snapshot);
+});
+```
+
+```typescript Filter Snapshot
+import { test } from '@playwright/test';
+
+test('snapshot with interesting nodes only', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const snapshot = await page.accessibility.snapshot({
+    interestingOnly: true,
+  });
+  
+  // Returns only semantically interesting nodes
+  console.log(snapshot);
+});
+```
+</CodeGroup>
+
+## ARIA Attributes
+
+Test ARIA attributes and roles to ensure proper semantic markup.
+
+<CodeGroup>
+```typescript Check ARIA Roles
+import { test, expect } from '@playwright/test';
+
+test('verify ARIA roles', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Check for specific roles
+  const navigation = page.getByRole('navigation');
+  await expect(navigation).toBeVisible();
+  
+  const main = page.getByRole('main');
+  await expect(main).toBeVisible();
+  
+  const button = page.getByRole('button', { name: 'Submit' });
+  await expect(button).toBeEnabled();
+});
+```
+
+```typescript ARIA Labels
+import { test, expect } from '@playwright/test';
+
+test('verify ARIA labels', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const searchInput = page.getByRole('searchbox', { name: 'Search' });
+  await expect(searchInput).toHaveAttribute('aria-label', 'Search');
+  
+  const closeButton = page.getByRole('button', { name: 'Close' });
+  await expect(closeButton).toHaveAttribute('aria-label', 'Close dialog');
+});
+```
+
+```typescript ARIA States
+import { test, expect } from '@playwright/test';
+
+test('verify ARIA states', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Check expanded state
+  const accordion = page.getByRole('button', { name: 'Expand' });
+  await expect(accordion).toHaveAttribute('aria-expanded', 'false');
+  
+  await accordion.click();
+  await expect(accordion).toHaveAttribute('aria-expanded', 'true');
+  
+  // Check disabled state
+  const submitButton = page.getByRole('button', { name: 'Submit' });
+  await expect(submitButton).toHaveAttribute('aria-disabled', 'false');
+});
+```
+</CodeGroup>
+
+## Keyboard Navigation
+
+Test keyboard accessibility to ensure all functionality is accessible without a mouse.
+
+<CodeGroup>
+```typescript Tab Navigation
+import { test, expect } from '@playwright/test';
+
+test('keyboard tab navigation', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Tab through focusable elements
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveAttribute('name', 'username');
+  
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveAttribute('name', 'password');
+  
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveRole('button');
+});
+```
+
+```typescript Keyboard Shortcuts
+import { test, expect } from '@playwright/test';
+
+test('keyboard shortcuts', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Test Escape key
+  await page.getByRole('button', { name: 'Open dialog' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  
+  // Test Enter key
+  await page.getByRole('button', { name: 'Submit' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Submitted')).toBeVisible();
+});
+```
+
+```typescript Arrow Key Navigation
+import { test, expect } from '@playwright/test';
+
+test('arrow key navigation', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const menu = page.getByRole('menu');
+  const firstItem = menu.getByRole('menuitem').first();
+  
+  await firstItem.focus();
+  
+  // Navigate with arrow keys
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator(':focus')).toHaveText('Second Item');
+  
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator(':focus')).toHaveText('Third Item');
+  
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator(':focus')).toHaveText('Second Item');
+});
+```
+</CodeGroup>
+
+## Focus Management
+
+Test that focus is properly managed in interactive components.
+
+<CodeGroup>
+```typescript Focus Trap
+import { test, expect } from '@playwright/test';
+
+test('modal focus trap', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await page.getByRole('button', { name: 'Open modal' }).click();
+  
+  const modal = page.getByRole('dialog');
+  await expect(modal).toBeVisible();
+  
+  // Focus should be trapped in modal
+  const focusableElements = modal.getByRole('button');
+  const count = await focusableElements.count();
+  
+  // Tab through all elements
+  for (let i = 0; i < count + 1; i++) {
+    await page.keyboard.press('Tab');
+  }
+  
+  // Focus should cycle back to first element in modal
+  const focused = page.locator(':focus');
+  await expect(focused).toBeFocused();
+  
+  // Verify focus is still in modal
+  await expect(modal.locator(':focus')).toBeVisible();
+});
+```
+
+```typescript Focus on Open
+import { test, expect } from '@playwright/test';
+
+test('focus management on dialog open', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const openButton = page.getByRole('button', { name: 'Settings' });
+  await openButton.click();
+  
+  // Dialog should be focused
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeFocused();
+  
+  // Or first focusable element should be focused
+  const firstInput = dialog.getByRole('textbox').first();
+  await expect(firstInput).toBeFocused();
+});
+```
+
+```typescript Focus on Close
+import { test, expect } from '@playwright/test';
+
+test('restore focus on dialog close', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const openButton = page.getByRole('button', { name: 'Open dialog' });
+  await openButton.click();
+  
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  
+  await page.keyboard.press('Escape');
+  
+  // Focus should return to the button that opened the dialog
+  await expect(openButton).toBeFocused();
+});
+```
+</CodeGroup>
+
+## Color Contrast
+
+While Playwright doesn't have built-in color contrast testing, you can compute contrast ratios.
+
+```typescript Check Contrast
+import { test, expect } from '@playwright/test';
+
+function getContrastRatio(rgb1: number[], rgb2: number[]): number {
+  const getLuminance = (rgb: number[]) => {
+    const [r, g, b] = rgb.map(val => {
+      val = val / 255;
+      return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  
+  const lum1 = getLuminance(rgb1);
+  const lum2 = getLuminance(rgb2);
+  const brightest = Math.max(lum1, lum2);
+  const darkest = Math.min(lum1, lum2);
+  
+  return (brightest + 0.05) / (darkest + 0.05);
+}
+
+test('check color contrast', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const button = page.getByRole('button', { name: 'Submit' });
+  
+  const colors = await button.evaluate(el => {
+    const style = window.getComputedStyle(el);
+    const parseRGB = (color: string) => {
+      const match = color.match(/\d+/g);
+      return match ? match.map(Number) : [0, 0, 0];
+    };
+    
+    return {
+      color: parseRGB(style.color),
+      backgroundColor: parseRGB(style.backgroundColor),
+    };
+  });
+  
+  const contrast = getContrastRatio(colors.color, colors.backgroundColor);
+  
+  // WCAG AA requires 4.5:1 for normal text
+  expect(contrast).toBeGreaterThanOrEqual(4.5);
+});
+```
+
+## Screen Reader Testing
+
+Test how your content is announced to screen readers.
+
+```typescript Screen Reader Text
+import { test, expect } from '@playwright/test';
+
+test('verify screen reader text', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Check for visually hidden but screen-reader accessible text
+  const srOnly = page.locator('.sr-only');
+  await expect(srOnly).toHaveText('For screen readers only');
+  
+  // Verify aria-describedby
+  const input = page.getByRole('textbox', { name: 'Email' });
+  const describedBy = await input.getAttribute('aria-describedby');
+  const description = page.locator(`#${describedBy}`);
+  await expect(description).toHaveText('Enter your email address');
+  
+  // Check live regions
+  const liveRegion = page.locator('[aria-live="polite"]');
+  await expect(liveRegion).toBeEmpty();
+  
+  await page.getByRole('button', { name: 'Load more' }).click();
+  await expect(liveRegion).toHaveText('10 more items loaded');
+});
+```
+
+## Form Accessibility
+
+Ensure forms are accessible with proper labels and error messages.
+
+<CodeGroup>
+```typescript Form Labels
+import { test, expect } from '@playwright/test';
+
+test('verify form labels', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Check explicit labels
+  const emailInput = page.getByRole('textbox', { name: 'Email address' });
+  await expect(emailInput).toBeVisible();
+  
+  // Check implicit labels
+  const nameInput = page.getByLabel('Full name');
+  await expect(nameInput).toBeVisible();
+  
+  // Verify label association
+  const passwordInput = page.locator('#password');
+  const labelFor = await passwordInput.getAttribute('id');
+  const label = page.locator(`label[for="${labelFor}"]`);
+  await expect(label).toHaveText('Password');
+});
+```
+
+```typescript Error Messages
+import { test, expect } from '@playwright/test';
+
+test('accessible error messages', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  const emailInput = page.getByRole('textbox', { name: 'Email' });
+  const submitButton = page.getByRole('button', { name: 'Submit' });
+  
+  // Submit without filling required field
+  await submitButton.click();
+  
+  // Check for aria-invalid
+  await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+  
+  // Check for error message association
+  const errorId = await emailInput.getAttribute('aria-describedby');
+  const errorMessage = page.locator(`#${errorId}`);
+  await expect(errorMessage).toHaveText('Email is required');
+  await expect(errorMessage).toHaveAttribute('role', 'alert');
+});
+```
+
+```typescript Required Fields
+import { test, expect } from '@playwright/test';
+
+test('required field indicators', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  const requiredInput = page.getByRole('textbox', { name: 'Email' });
+  
+  // Check for required attribute
+  await expect(requiredInput).toHaveAttribute('required');
+  
+  // Or aria-required
+  await expect(requiredInput).toHaveAttribute('aria-required', 'true');
+  
+  // Verify visual indicator
+  const label = page.locator('label[for="email"]');
+  await expect(label).toContainText('*');
+});
+```
+</CodeGroup>
+
+## Integration with Axe
+
+Integrate with axe-core for comprehensive accessibility testing.
+
+<CodeGroup>
+```typescript Install Axe
+// npm install --save-dev @axe-core/playwright
+```
+
+```typescript Basic Axe Test
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+
+test('should not have accessibility violations', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+  
+  expect(accessibilityScanResults.violations).toEqual([]);
+});
+```
+
+```typescript Axe with Specific Rules
+import { test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+
+test('check specific rules', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze();
+  
+  expect(results.violations).toEqual([]);
+});
+```
+
+```typescript Axe Exclude Elements
+import { test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+
+test('exclude third-party widgets', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const results = await new AxeBuilder({ page })
+    .exclude('#third-party-widget')
+    .analyze();
+  
+  expect(results.violations).toEqual([]);
+});
+```
+</CodeGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Semantic HTML" icon="code">
+    Use semantic HTML elements and ARIA roles to provide meaningful structure.
+  </Card>
+  
+  <Card title="Keyboard First" icon="keyboard">
+    Test all functionality with keyboard navigation before testing with assistive technologies.
+  </Card>
+  
+  <Card title="Multiple Methods" icon="layer-group">
+    Combine automated testing (axe) with manual testing using actual screen readers.
+  </Card>
+  
+  <Card title="Progressive Enhancement" icon="arrow-up">
+    Ensure core functionality works without JavaScript before adding enhancements.
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Locators" icon="crosshairs" href="/core-concepts/locators">
+    Use role-based locators for accessible selectors
+  </Card>
+  
+  <Card title="Assertions" icon="check" href="/essentials/assertions">
+    Assert accessibility attributes
+  </Card>
+</CardGroup>

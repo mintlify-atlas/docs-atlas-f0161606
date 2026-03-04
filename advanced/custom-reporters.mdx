@@ -1,0 +1,426 @@
+---
+title: "Custom Reporters"
+description: "Create custom test reporters to integrate with your CI/CD pipeline and reporting tools"
+---
+
+## Overview
+
+Playwright provides a flexible reporter API that allows you to create custom test reporters. Custom reporters enable you to integrate test results with your CI/CD pipeline, send notifications, generate custom reports, or integrate with third-party services.
+
+## Reporter API
+
+Custom reporters implement the `Reporter` interface with lifecycle hooks that are called during test execution.
+
+### Core Reporter Methods
+
+<CodeGroup>
+```typescript Custom Reporter Structure
+import type {
+  FullConfig,
+  FullResult,
+  Reporter,
+  Suite,
+  TestCase,
+  TestResult,
+} from '@playwright/test/reporter';
+
+class MyReporter implements Reporter {
+  onBegin(config: FullConfig, suite: Suite) {
+    console.log(`Starting test run with ${suite.allTests().length} tests`);
+  }
+
+  onTestBegin(test: TestCase, result: TestResult) {
+    console.log(`Starting test ${test.title}`);
+  }
+
+  onTestEnd(test: TestCase, result: TestResult) {
+    console.log(`Finished test ${test.title}: ${result.status}`);
+  }
+
+  onEnd(result: FullResult) {
+    console.log(`Finished test run: ${result.status}`);
+  }
+}
+
+export default MyReporter;
+```
+
+```typescript Reporter with Options
+class CustomReporter implements Reporter {
+  private options: any;
+
+  constructor(options: any = {}) {
+    this.options = options;
+  }
+
+  onBegin(config: FullConfig, suite: Suite) {
+    if (this.options.verbose) {
+      console.log(`Running ${suite.allTests().length} tests`);
+    }
+  }
+
+  onTestEnd(test: TestCase, result: TestResult) {
+    if (result.status === 'failed') {
+      this.reportFailure(test, result);
+    }
+  }
+
+  private reportFailure(test: TestCase, result: TestResult) {
+    console.log(`❌ ${test.title}`);
+    console.log(`   Duration: ${result.duration}ms`);
+    if (result.error) {
+      console.log(`   Error: ${result.error.message}`);
+    }
+  }
+
+  onEnd(result: FullResult) {
+    console.log(`Test run completed: ${result.status}`);
+  }
+}
+
+export default CustomReporter;
+```
+</CodeGroup>
+
+## Lifecycle Hooks
+
+The reporter lifecycle provides hooks at different stages of test execution.
+
+### Available Hooks
+
+<AccordionGroup>
+  <Accordion title="onBegin" icon="play">
+    Called once before running tests. Receives the full configuration and root suite.
+    
+    ```typescript
+    onBegin(config: FullConfig, suite: Suite): void
+    ```
+  </Accordion>
+
+  <Accordion title="onTestBegin" icon="clock">
+    Called for each test when it starts running.
+    
+    ```typescript
+    onTestBegin(test: TestCase, result: TestResult): void
+    ```
+  </Accordion>
+
+  <Accordion title="onStdOut" icon="terminal">
+    Called when a test writes to stdout.
+    
+    ```typescript
+    onStdOut(chunk: string | Buffer, test?: TestCase, result?: TestResult): void
+    ```
+  </Accordion>
+
+  <Accordion title="onStdErr" icon="bug">
+    Called when a test writes to stderr.
+    
+    ```typescript
+    onStdErr(chunk: string | Buffer, test?: TestCase, result?: TestResult): void
+    ```
+  </Accordion>
+
+  <Accordion title="onTestEnd" icon="check">
+    Called after each test finishes.
+    
+    ```typescript
+    onTestEnd(test: TestCase, result: TestResult): void
+    ```
+  </Accordion>
+
+  <Accordion title="onEnd" icon="flag-checkered">
+    Called after all tests complete.
+    
+    ```typescript
+    async onEnd(result: FullResult): Promise<void>
+    ```
+  </Accordion>
+
+  <Accordion title="onError" icon="exclamation-triangle">
+    Called on global errors not associated with a specific test.
+    
+    ```typescript
+    onError(error: TestError): void
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Practical Examples
+
+### JSON Reporter
+
+Create a custom JSON reporter that outputs structured test results.
+
+```typescript JSON Reporter Example
+import fs from 'fs';
+import path from 'path';
+import type {
+  FullConfig,
+  FullResult,
+  Reporter,
+  Suite,
+  TestCase,
+  TestResult,
+} from '@playwright/test/reporter';
+
+interface JSONReportTest {
+  title: string;
+  file: string;
+  line: number;
+  column: number;
+  duration: number;
+  status: string;
+  error?: string;
+}
+
+class JSONReporter implements Reporter {
+  private config!: FullConfig;
+  private suite!: Suite;
+  private results: JSONReportTest[] = [];
+  private outputFile: string;
+
+  constructor(options: { outputFile?: string } = {}) {
+    this.outputFile = options.outputFile || 'test-results.json';
+  }
+
+  onBegin(config: FullConfig, suite: Suite) {
+    this.config = config;
+    this.suite = suite;
+  }
+
+  onTestEnd(test: TestCase, result: TestResult) {
+    this.results.push({
+      title: test.title,
+      file: path.relative(this.config.rootDir, test.location.file),
+      line: test.location.line,
+      column: test.location.column,
+      duration: result.duration,
+      status: result.status,
+      error: result.error?.message,
+    });
+  }
+
+  async onEnd(result: FullResult) {
+    const report = {
+      status: result.status,
+      duration: result.duration,
+      startTime: result.startTime,
+      tests: this.results,
+    };
+
+    await fs.promises.writeFile(
+      this.outputFile,
+      JSON.stringify(report, null, 2)
+    );
+    console.log(`JSON report written to ${this.outputFile}`);
+  }
+}
+
+export default JSONReporter;
+```
+
+### Slack Notification Reporter
+
+Send test results to Slack when tests fail.
+
+```typescript Slack Reporter
+import type {
+  FullConfig,
+  FullResult,
+  Reporter,
+  Suite,
+  TestCase,
+  TestResult,
+} from '@playwright/test/reporter';
+
+class SlackReporter implements Reporter {
+  private webhookUrl: string;
+  private failures: Array<{ test: TestCase; result: TestResult }> = [];
+
+  constructor(options: { webhookUrl: string }) {
+    this.webhookUrl = options.webhookUrl;
+  }
+
+  onBegin(config: FullConfig, suite: Suite) {
+    console.log(`Running ${suite.allTests().length} tests`);
+  }
+
+  onTestEnd(test: TestCase, result: TestResult) {
+    if (result.status === 'failed' || result.status === 'timedOut') {
+      this.failures.push({ test, result });
+    }
+  }
+
+  async onEnd(result: FullResult) {
+    if (this.failures.length === 0) {
+      await this.sendSlackMessage({
+        text: '✅ All tests passed!',
+        color: 'good',
+      });
+      return;
+    }
+
+    const failureMessages = this.failures.map(({ test, result }) => {
+      return `• ${test.title} - ${result.status}\n  ${result.error?.message || 'No error message'}`;
+    });
+
+    await this.sendSlackMessage({
+      text: `❌ ${this.failures.length} test(s) failed`,
+      color: 'danger',
+      fields: [
+        {
+          title: 'Failed Tests',
+          value: failureMessages.join('\n\n'),
+        },
+      ],
+    });
+  }
+
+  private async sendSlackMessage(message: any) {
+    try {
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attachments: [message],
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to send Slack notification');
+      }
+    } catch (error) {
+      console.error('Error sending Slack notification:', error);
+    }
+  }
+}
+
+export default SlackReporter;
+```
+
+### Custom HTML Reporter
+
+Generate a custom HTML report with test results.
+
+```typescript HTML Reporter
+import fs from 'fs';
+import type {
+  FullConfig,
+  FullResult,
+  Reporter,
+  Suite,
+  TestCase,
+  TestResult,
+} from '@playwright/test/reporter';
+
+class HTMLReporter implements Reporter {
+  private suite!: Suite;
+  private startTime!: Date;
+  private outputFile: string;
+
+  constructor(options: { outputFile?: string } = {}) {
+    this.outputFile = options.outputFile || 'report.html';
+  }
+
+  onBegin(config: FullConfig, suite: Suite) {
+    this.suite = suite;
+    this.startTime = new Date();
+  }
+
+  async onEnd(result: FullResult) {
+    const allTests = this.suite.allTests();
+    const passed = allTests.filter(t => t.ok()).length;
+    const failed = allTests.filter(t => !t.ok()).length;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .summary { background: #f5f5f5; padding: 20px; border-radius: 5px; }
+    .passed { color: green; }
+    .failed { color: red; }
+    .test { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <h1>Test Report</h1>
+  <div class="summary">
+    <p>Total: ${allTests.length}</p>
+    <p class="passed">Passed: ${passed}</p>
+    <p class="failed">Failed: ${failed}</p>
+    <p>Duration: ${result.duration}ms</p>
+  </div>
+  <h2>Test Results</h2>
+  ${allTests.map(test => `
+    <div class="test ${test.ok() ? 'passed' : 'failed'}">
+      <strong>${test.title}</strong>
+      <p>Status: ${test.outcome()}</p>
+    </div>
+  `).join('')}
+</body>
+</html>
+    `;
+
+    await fs.promises.writeFile(this.outputFile, html);
+    console.log(`HTML report generated: ${this.outputFile}`);
+  }
+}
+
+export default HTMLReporter;
+```
+
+## Configuration
+
+Register your custom reporter in the Playwright configuration file.
+
+```typescript playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  reporter: [
+    ['./my-custom-reporter.ts', { outputFile: 'custom-report.json' }],
+    ['html'], // Keep default HTML reporter
+    ['list'], // Keep list reporter for terminal output
+  ],
+});
+```
+
+<Card title="Multiple Reporters" icon="layer-group">
+  You can use multiple reporters simultaneously. Playwright will call the hooks on all reporters in the order they are defined.
+</Card>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Performance" icon="gauge-high">
+    Keep reporter logic lightweight to avoid slowing down test execution. Use async operations for I/O.
+  </Card>
+  
+  <Card title="Error Handling" icon="shield-halved">
+    Always handle errors in reporters gracefully. A failing reporter shouldn't break the test run.
+  </Card>
+  
+  <Card title="Configuration" icon="gear">
+    Make reporters configurable through constructor options for maximum flexibility.
+  </Card>
+  
+  <Card title="Standards" icon="file-code">
+    Follow common reporting standards (JUnit XML, TAP) when integrating with CI/CD systems.
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Built-in Reporters" icon="list" href="/essentials/test-reporters">
+    Learn about Playwright's built-in reporters
+  </Card>
+  
+  <Card title="CI/CD Integration" icon="circle-nodes" href="/essentials/ci-cd">
+    Configure reporters for continuous integration
+  </Card>
+</CardGroup>

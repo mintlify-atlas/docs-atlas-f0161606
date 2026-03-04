@@ -1,0 +1,554 @@
+---
+title: 'Test Retries'
+description: 'Learn how to configure and use test retries in Playwright for handling flaky tests'
+---
+
+## Introduction
+
+Test retries automatically re-run failed tests to handle flaky tests and improve test reliability. Playwright provides built-in retry mechanisms with detailed tracking.
+
+## Configuring Retries
+
+From `src/common/config.ts:192`:
+
+### Global Retry Configuration
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  retries: 2, // Retry failed tests twice
+});
+```
+
+### Environment-Based Retries
+
+```typescript
+export default defineConfig({
+  retries: process.env.CI ? 2 : 0,
+  // Retry in CI, no retries locally
+});
+```
+
+### Project-Level Retries
+
+```typescript
+projects: [
+  {
+    name: 'chromium',
+    use: { browserName: 'chromium' },
+    retries: 2,
+  },
+  {
+    name: 'webkit',
+    use: { browserName: 'webkit' },
+    retries: 1, // Different retry count
+  },
+]
+```
+
+### Test-Level Retries
+
+From `src/common/testType.ts:186-209`:
+
+```typescript
+test.describe('Flaky suite', () => {
+  test.describe.configure({ retries: 3 });
+  
+  test('flaky test', async ({ page }) => {
+    // This test will be retried up to 3 times
+  });
+});
+```
+
+## How Retries Work
+
+From `src/common/test.ts:257-284`:
+
+### Retry Execution Flow
+
+```typescript
+test('example', async ({ page }, testInfo) => {
+  console.log(`Attempt ${testInfo.retry + 1}`);
+});
+
+// With retries: 2
+// First run (retry: 0) - FAIL
+// Second run (retry: 1) - FAIL  
+// Third run (retry: 2) - PASS -> Test passes
+```
+
+### Test Result Structure
+
+```typescript
+interface TestCase {
+  results: TestResult[];  // One result per attempt
+  retries: number;        // Max retry count
+}
+
+interface TestResult {
+  retry: number;          // Which attempt (0-based)
+  status: 'passed' | 'failed' | 'timedOut' | 'skipped';
+  duration: number;
+  errors: TestError[];
+}
+```
+
+## Retry Behavior
+
+### Test Outcomes
+
+From `src/common/test.ts:292-294`:
+
+```typescript
+function outcome(): 'skipped' | 'expected' | 'unexpected' | 'flaky' {
+  // 'expected': All attempts passed or test marked as .skip/.fixme
+  // 'unexpected': All attempts failed
+  // 'flaky': Failed initially, then passed
+  // 'skipped': Test was skipped
+}
+```
+
+**Example outcomes:**
+
+```typescript
+// Expected (all pass)
+retries: 2
+attempt 0: PASS -> outcome: 'expected'
+
+// Flaky (eventual pass)
+retries: 2
+attempt 0: FAIL
+attempt 1: PASS -> outcome: 'flaky'
+
+// Unexpected (all fail)
+retries: 2
+attempt 0: FAIL
+attempt 1: FAIL
+attempt 2: FAIL -> outcome: 'unexpected'
+```
+
+### Retry Context
+
+Each retry gets a fresh test environment:
+
+```typescript
+test('retry example', async ({ page, context }) => {
+  // Fresh page and context for each retry
+  // No state carried over from previous attempts
+});
+```
+
+## Accessing Retry Information
+
+From test info:
+
+```typescript
+test('check retry', async ({ page }, testInfo) => {
+  console.log(testInfo.retry);           // Current retry number (0-based)
+  console.log(testInfo.project.retries); // Max retries configured
+  
+  if (testInfo.retry > 0) {
+    // This is a retry attempt
+    console.log('Test is being retried');
+  }
+});
+```
+
+## Recording on Retries
+
+From `src/common/config.ts:118-119`:
+
+### Screenshots
+
+```typescript
+export default defineConfig({
+  use: {
+    screenshot: 'only-on-failure', // Captures on all failed attempts
+  },
+});
+```
+
+### Videos
+
+```typescript
+export default defineConfig({
+  use: {
+    video: 'retain-on-failure',     // Keep video if any attempt fails
+    video: 'on-first-retry',         // Record only on first retry
+  },
+});
+```
+
+### Traces
+
+```typescript
+export default defineConfig({
+  use: {
+    trace: 'on-first-retry', // Capture trace on first retry
+  },
+});
+```
+
+## Conditional Logic Based on Retries
+
+```typescript
+test('conditional retry logic', async ({ page }, testInfo) => {
+  if (testInfo.retry > 0) {
+    // Add extra wait time on retry
+    await page.waitForTimeout(5000);
+  }
+  
+  // Test logic
+  await page.goto('/');
+});
+```
+
+## Retry Strategies
+
+### Aggressive Retries for Flaky Tests
+
+```typescript
+test.describe('Known flaky area', () => {
+  test.describe.configure({ retries: 5 });
+  
+  test('network-dependent test', async ({ page }) => {
+    // Tests with network calls
+  });
+});
+```
+
+### No Retries for Unit Tests
+
+```typescript
+test.describe('Unit tests', () => {
+  test.describe.configure({ retries: 0 });
+  
+  test('pure logic test', async () => {
+    // Should never be flaky
+  });
+});
+```
+
+### Smart Retry Configuration
+
+```typescript
+export default defineConfig({
+  projects: [
+    {
+      name: 'quick-checks',
+      testMatch: /.*\.unit\.spec\.ts/,
+      retries: 0, // Unit tests shouldn't need retries
+    },
+    {
+      name: 'e2e',
+      testMatch: /.*\.e2e\.spec\.ts/,
+      retries: process.env.CI ? 3 : 1,
+    },
+  ],
+});
+```
+
+## Debugging Flaky Tests
+
+### Identify Flaky Tests
+
+```typescript
+test.afterEach(async ({}, testInfo) => {
+  if (testInfo.status === 'passed' && testInfo.retry > 0) {
+    console.log(`⚠️  FLAKY TEST: ${testInfo.title}`);
+    console.log(`   Failed on attempts: 0-${testInfo.retry - 1}`);
+    console.log(`   Passed on attempt: ${testInfo.retry}`);
+  }
+});
+```
+
+### Track Retry Patterns
+
+```typescript
+const retryStats = new Map<string, number[]>();
+
+test.afterEach(async ({}, testInfo) => {
+  const key = testInfo.titlePath.join(' > ');
+  const attempts = retryStats.get(key) || [];
+  attempts.push(testInfo.retry);
+  retryStats.set(key, attempts);
+  
+  if (testInfo.retry > 0) {
+    console.log(`Retry stats for ${key}:`, attempts);
+  }
+});
+```
+
+## CLI Retry Options
+
+From CLI:
+
+```bash
+# Override config retries
+npx playwright test --retries=3
+
+# No retries (for debugging)
+npx playwright test --retries=0
+
+# Run only failed tests from last run
+npx playwright test --last-failed
+```
+
+## Failing on Flaky Tests
+
+From `src/common/config.ts:83`:
+
+```typescript
+export default defineConfig({
+  failOnFlakyTests: true,
+  retries: 2,
+});
+
+// Test that passes on retry will be marked as failure
+// Useful for ensuring tests are not flaky before merging
+```
+
+```bash
+# CLI option
+npx playwright test --fail-on-flaky-tests
+```
+
+## Repeat Tests
+
+From `src/common/config.ts:191`:
+
+Different from retries - runs tests multiple times regardless of outcome:
+
+```typescript
+export default defineConfig({
+  repeatEach: 3, // Run each test 3 times
+});
+```
+
+```typescript
+test('stability test', async ({ page }, testInfo) => {
+  console.log(`Run ${testInfo.repeatEachIndex + 1}/3`);
+  // All 3 runs must pass for test to pass
+});
+```
+
+## Best Practices
+
+### 1. Use Retries Wisely
+
+```typescript
+// Good: Handle expected flakiness
+export default defineConfig({
+  retries: process.env.CI ? 2 : 0,
+});
+
+// Bad: Hiding real problems
+export default defineConfig({
+  retries: 10, // Masking actual issues
+});
+```
+
+### 2. Fix Root Causes
+
+```typescript
+// Don't just retry - fix the flake
+test('flaky test', async ({ page }) => {
+  // Bad: Random timeout
+  await page.waitForTimeout(Math.random() * 1000);
+  
+  // Good: Wait for specific condition
+  await page.waitForSelector('.loaded');
+});
+```
+
+### 3. Add Diagnostics on Retry
+
+```typescript
+test('diagnostic test', async ({ page }, testInfo) => {
+  if (testInfo.retry > 0) {
+    // Gather extra debugging info
+    await page.screenshot({ 
+      path: `retry-${testInfo.retry}.png` 
+    });
+    console.log('Network activity:', await page.evaluate(
+      () => performance.getEntries()
+    ));
+  }
+  
+  // Test logic
+});
+```
+
+### 4. Monitor Retry Rates
+
+```typescript
+// Track retry metrics
+class RetryReporter {
+  onTestEnd(test, result) {
+    if (result.retry > 0) {
+      // Log to metrics system
+      metrics.increment('test.retry', {
+        test: test.title,
+        attempt: result.retry,
+      });
+    }
+  }
+}
+```
+
+### 5. Different Strategies for Different Tests
+
+```typescript
+export default defineConfig({
+  projects: [
+    {
+      name: 'smoke',
+      testMatch: /.*\.smoke\.spec\.ts/,
+      retries: 3, // Critical tests get more retries
+    },
+    {
+      name: 'visual',
+      testMatch: /.*\.visual\.spec\.ts/,
+      retries: 0, // Visual tests shouldn't be flaky
+    },
+  ],
+});
+```
+
+## Common Anti-Patterns
+
+### Anti-Pattern 1: Excessive Retries
+
+```typescript
+// Bad: Hiding problems
+retries: 10
+
+// Good: Investigate and fix
+retries: 2
+```
+
+### Anti-Pattern 2: Retry-Dependent Logic
+
+```typescript
+// Bad: Test behaves differently on retry
+test('bad retry', async ({ page }, testInfo) => {
+  if (testInfo.retry === 0) {
+    // Do something
+  } else {
+    // Do something different - test is inconsistent!
+  }
+});
+
+// Good: Consistent behavior
+test('good retry', async ({ page }, testInfo) => {
+  if (testInfo.retry > 0) {
+    // Only add debugging or longer waits
+    await page.waitForLoadState('networkidle');
+  }
+  // Same test logic regardless of retry
+});
+```
+
+### Anti-Pattern 3: Ignoring Flaky Tests
+
+```typescript
+// Bad: Accepting flakiness
+retries: 5 // Just retry until it passes
+
+// Good: Address flakiness
+test.beforeEach(async ({ page }) => {
+  // Ensure consistent starting state
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+});
+```
+
+## Example: Complete Retry Strategy
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  // Global retry configuration
+  retries: process.env.CI ? 2 : 0,
+  
+  // Fail build if tests are flaky
+  failOnFlakyTests: !!process.env.CI,
+  
+  // Record on retries
+  use: {
+    trace: 'on-first-retry',
+    video: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+  },
+  
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+      retries: 0, // Setup shouldn't need retries
+    },
+    {
+      name: 'unit',
+      testMatch: /.*\.unit\.spec\.ts/,
+      retries: 0, // Unit tests are deterministic
+    },
+    {
+      name: 'api',
+      testMatch: /.*\.api\.spec\.ts/,
+      retries: 1, // API tests may have network issues
+    },
+    {
+      name: 'e2e',
+      testMatch: /.*\.e2e\.spec\.ts/,
+      retries: process.env.CI ? 2 : 1,
+      dependencies: ['setup'],
+    },
+  ],
+});
+```
+
+## Monitoring Retry Health
+
+```typescript
+import { test as base } from '@playwright/test';
+
+class RetryMonitor {
+  private retries = new Map<string, number>();
+  
+  recordRetry(testId: string) {
+    this.retries.set(testId, (this.retries.get(testId) || 0) + 1);
+  }
+  
+  getStats() {
+    const total = Array.from(this.retries.values())
+      .reduce((a, b) => a + b, 0);
+    const avgRetries = total / this.retries.size;
+    return { total, avgRetries, tests: this.retries.size };
+  }
+}
+
+const monitor = new RetryMonitor();
+
+export const test = base.extend({
+  autoRetryMonitor: [async ({}, use, testInfo) => {
+    await use();
+    if (testInfo.retry > 0) {
+      monitor.recordRetry(testInfo.testId);
+      console.log('Retry stats:', monitor.getStats());
+    }
+  }, { auto: true }],
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/test-runner/configuration">
+    Configure retry settings
+  </Card>
+  <Card title="Test Hooks" icon="hook" href="/test-runner/test-hooks">
+    Set up consistent test state
+  </Card>
+</CardGroup>

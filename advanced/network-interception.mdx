@@ -1,0 +1,517 @@
+---
+title: "Network Interception"
+description: "Intercept, modify, and mock network requests and responses with the Route API"
+---
+
+## Overview
+
+Playwright's network interception allows you to intercept, modify, mock, or block network requests. This is essential for testing edge cases, simulating API responses, and controlling network conditions.
+
+## Basic Request Interception
+
+Intercept and handle network requests using the `route` API.
+
+<CodeGroup>
+```typescript Intercept Requests
+import { test, expect } from '@playwright/test';
+
+test('intercept API request', async ({ page }) => {
+  // Intercept all API calls
+  await page.route('**/api/**', route => {
+    console.log('Request URL:', route.request().url());
+    route.continue();
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Block Resources
+import { test } from '@playwright/test';
+
+test('block images', async ({ page }) => {
+  // Block all image requests
+  await page.route('**/*.{png,jpg,jpeg,gif}', route => route.abort());
+  
+  await page.goto('https://example.com');
+  // Page loads without images
+});
+```
+
+```typescript URL Pattern Matching
+import { test } from '@playwright/test';
+
+test('match specific patterns', async ({ page }) => {
+  // Match using glob pattern
+  await page.route('**/api/users/*', route => route.continue());
+  
+  // Match using RegExp
+  await page.route(/\.json$/, route => route.continue());
+  
+  // Match using function
+  await page.route(url => url.pathname.startsWith('/api'), route => {
+    route.continue();
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+</CodeGroup>
+
+## Mock API Responses
+
+Return mock data instead of making real API requests.
+
+<CodeGroup>
+```typescript Mock JSON Response
+import { test, expect } from '@playwright/test';
+
+test('mock API response', async ({ page }) => {
+  await page.route('**/api/users', route => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { id: 1, name: 'John Doe' },
+        { id: 2, name: 'Jane Smith' },
+      ]),
+    });
+  });
+  
+  await page.goto('https://example.com');
+  
+  // Verify mocked data appears
+  await expect(page.locator('text=John Doe')).toBeVisible();
+});
+```
+
+```typescript Mock with JSON Helper
+import { test } from '@playwright/test';
+
+test('mock using json option', async ({ page }) => {
+  await page.route('**/api/users', route => {
+    route.fulfill({
+      json: [
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' },
+      ],
+    });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Mock from File
+import { test } from '@playwright/test';
+import path from 'path';
+
+test('serve mock data from file', async ({ page }) => {
+  await page.route('**/api/data', route => {
+    route.fulfill({
+      path: path.join(__dirname, 'mocks/data.json'),
+    });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Mock Different Status Codes
+import { test } from '@playwright/test';
+
+test('mock error response', async ({ page }) => {
+  await page.route('**/api/users', route => {
+    route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    });
+  });
+  
+  await page.goto('https://example.com');
+  // Test error handling
+});
+
+test('mock server error', async ({ page }) => {
+  await page.route('**/api/users', route => {
+    route.fulfill({
+      status: 500,
+      body: 'Internal Server Error',
+    });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+</CodeGroup>
+
+## Modify Requests
+
+Change request properties before they are sent.
+
+<CodeGroup>
+```typescript Modify Headers
+import { test } from '@playwright/test';
+
+test('add custom headers', async ({ page }) => {
+  await page.route('**/api/**', route => {
+    const headers = {
+      ...route.request().headers(),
+      'X-Custom-Header': 'custom-value',
+      'Authorization': 'Bearer token123',
+    };
+    
+    route.continue({ headers });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Modify Request Body
+import { test } from '@playwright/test';
+
+test('modify POST data', async ({ page }) => {
+  await page.route('**/api/users', route => {
+    const postData = route.request().postDataJSON();
+    
+    // Modify the data
+    const modifiedData = {
+      ...postData,
+      timestamp: Date.now(),
+    };
+    
+    route.continue({
+      postData: JSON.stringify(modifiedData),
+    });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Change Request URL
+import { test } from '@playwright/test';
+
+test('redirect to different endpoint', async ({ page }) => {
+  await page.route('**/api/v1/**', route => {
+    const url = route.request().url().replace('/v1/', '/v2/');
+    route.continue({ url });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+</CodeGroup>
+
+## Modify Responses
+
+Fetch the real response and modify it before returning.
+
+<CodeGroup>
+```typescript Modify Response Body
+import { test } from '@playwright/test';
+
+test('modify API response', async ({ page }) => {
+  await page.route('**/api/users', async route => {
+    // Fetch the original response
+    const response = await route.fetch();
+    const json = await response.json();
+    
+    // Modify the data
+    const modified = json.map(user => ({
+      ...user,
+      modified: true,
+    }));
+    
+    // Return modified response
+    route.fulfill({
+      response,
+      json: modified,
+    });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Modify Response Headers
+import { test } from '@playwright/test';
+
+test('modify response headers', async ({ page }) => {
+  await page.route('**/api/**', async route => {
+    const response = await route.fetch();
+    
+    route.fulfill({
+      response,
+      headers: {
+        ...response.headers(),
+        'X-Modified': 'true',
+        'Cache-Control': 'no-cache',
+      },
+    });
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+```typescript Inject Content into HTML
+import { test } from '@playwright/test';
+
+test('inject script into page', async ({ page }) => {
+  await page.route('**/index.html', async route => {
+    const response = await route.fetch();
+    let body = await response.text();
+    
+    // Inject script before closing body tag
+    body = body.replace(
+      '</body>',
+      '<script>window.injected = true;</script></body>'
+    );
+    
+    route.fulfill({
+      response,
+      body,
+    });
+  });
+  
+  await page.goto('https://example.com');
+  
+  const injected = await page.evaluate(() => window.injected);
+  expect(injected).toBe(true);
+});
+```
+</CodeGroup>
+
+## Request Information
+
+Access detailed information about intercepted requests.
+
+```typescript Inspect Requests
+import { test } from '@playwright/test';
+
+test('log request details', async ({ page }) => {
+  await page.route('**/*', route => {
+    const request = route.request();
+    
+    console.log('URL:', request.url());
+    console.log('Method:', request.method());
+    console.log('Headers:', request.headers());
+    console.log('Post Data:', request.postData());
+    console.log('Resource Type:', request.resourceType());
+    console.log('Is Navigation:', request.isNavigationRequest());
+    
+    route.continue();
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+## Context-Level Interception
+
+Intercept requests for all pages in a context.
+
+```typescript Context Routes
+import { test } from '@playwright/test';
+
+test('intercept at context level', async ({ context, page }) => {
+  // Apply to all pages in the context
+  await context.route('**/api/**', route => {
+    route.fulfill({
+      json: { mocked: true },
+    });
+  });
+  
+  await page.goto('https://example.com');
+  
+  // Open another page - routing still applies
+  const page2 = await context.newPage();
+  await page2.goto('https://example.com');
+});
+```
+
+## Conditional Interception
+
+Apply different handling based on request properties.
+
+```typescript Conditional Routing
+import { test } from '@playwright/test';
+
+test('conditional interception', async ({ page }) => {
+  await page.route('**/api/**', route => {
+    const request = route.request();
+    
+    // Different handling based on method
+    if (request.method() === 'POST') {
+      route.fulfill({ json: { created: true } });
+    } else if (request.method() === 'DELETE') {
+      route.fulfill({ status: 204 });
+    } else {
+      route.continue();
+    }
+  });
+  
+  await page.goto('https://example.com');
+});
+
+test('intercept based on headers', async ({ page }) => {
+  await page.route('**/api/**', route => {
+    const request = route.request();
+    const headers = request.headers();
+    
+    if (headers['authorization']) {
+      // Allow authenticated requests
+      route.continue();
+    } else {
+      // Block unauthorized requests
+      route.fulfill({ status: 401, body: 'Unauthorized' });
+    }
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+
+## Abort Requests
+
+Block specific requests to test offline scenarios or reduce load times.
+
+<CodeGroup>
+```typescript Abort with Error
+import { test } from '@playwright/test';
+
+test('simulate network failure', async ({ page }) => {
+  await page.route('**/api/users', route => {
+    route.abort('failed');
+  });
+  
+  await page.goto('https://example.com');
+  // Test how app handles failed requests
+});
+```
+
+```typescript Abort Types
+import { test } from '@playwright/test';
+
+test('different abort reasons', async ({ page }) => {
+  await page.route('**/slow-endpoint', route => route.abort('timedout'));
+  await page.route('**/blocked', route => route.abort('blockedbyclient'));
+  await page.route('**/failed', route => route.abort('failed'));
+  
+  await page.goto('https://example.com');
+});
+```
+</CodeGroup>
+
+## HAR Recording and Replay
+
+Record network traffic to HAR files and replay them later.
+
+<CodeGroup>
+```typescript Record HAR
+import { test } from '@playwright/test';
+
+test('record network traffic', async ({ context, page }) => {
+  // Start recording
+  await context.routeFromHAR('recordings/network.har', {
+    update: true,
+  });
+  
+  await page.goto('https://example.com');
+  // All network traffic is recorded
+});
+```
+
+```typescript Replay HAR
+import { test } from '@playwright/test';
+
+test('replay from HAR', async ({ context, page }) => {
+  // Replay recorded traffic
+  await context.routeFromHAR('recordings/network.har', {
+    notFound: 'abort',
+  });
+  
+  await page.goto('https://example.com');
+  // Uses recorded responses
+});
+```
+
+```typescript Update HAR
+import { test } from '@playwright/test';
+
+test('update HAR file', async ({ context, page }) => {
+  await context.routeFromHAR('recordings/network.har', {
+    update: true,
+    url: '**/api/**', // Only record API calls
+  });
+  
+  await page.goto('https://example.com');
+});
+```
+</CodeGroup>
+
+## Unroute
+
+Remove route handlers when no longer needed.
+
+```typescript Remove Routes
+import { test } from '@playwright/test';
+
+test('remove route handler', async ({ page }) => {
+  const handler = route => route.fulfill({ json: { mocked: true } });
+  
+  // Add route
+  await page.route('**/api/data', handler);
+  
+  await page.goto('https://example.com');
+  // Uses mocked data
+  
+  // Remove route
+  await page.unroute('**/api/data', handler);
+  
+  await page.reload();
+  // Uses real API now
+});
+
+test('remove all routes', async ({ page }) => {
+  await page.route('**/api/**', route => route.continue());
+  
+  // Remove all routes
+  await page.unrouteAll({ behavior: 'wait' });
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Pattern Specificity" icon="bullseye">
+    Use specific patterns to avoid unintended interceptions. Match exact endpoints when possible.
+  </Card>
+  
+  <Card title="Error Handling" icon="shield-exclamation">
+    Always test both success and failure scenarios. Mock error responses to test error handling.
+  </Card>
+  
+  <Card title="Performance" icon="gauge-high">
+    Use network mocking to speed up tests by avoiding slow external APIs.
+  </Card>
+  
+  <Card title="Realistic Mocks" icon="clone">
+    Keep mock data realistic and up-to-date with actual API responses.
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Network Events" icon="network-wired" href="/essentials/network-events">
+    Monitor and analyze network activity
+  </Card>
+  
+  <Card title="API Testing" icon="code" href="/api-reference/api-testing">
+    Test APIs directly with APIRequestContext
+  </Card>
+</CardGroup>

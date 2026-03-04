@@ -1,0 +1,476 @@
+---
+title: "Visual Comparisons"
+description: "Perform visual regression testing with screenshots and pixel-perfect comparisons"
+---
+
+## Overview
+
+Playwright provides powerful visual comparison capabilities to detect visual regressions. Compare screenshots pixel-by-pixel to ensure your UI remains consistent across changes.
+
+## Screenshot Assertions
+
+The `toHaveScreenshot()` assertion compares screenshots and highlights differences.
+
+<CodeGroup>
+```typescript Basic Screenshot Test
+import { test, expect } from '@playwright/test';
+
+test('visual regression test', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // First run will generate the baseline screenshot
+  // Subsequent runs will compare against the baseline
+  await expect(page).toHaveScreenshot();
+});
+```
+
+```typescript Element Screenshot
+import { test, expect } from '@playwright/test';
+
+test('compare specific element', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const header = page.locator('header');
+  await expect(header).toHaveScreenshot('header.png');
+  
+  const card = page.locator('.product-card').first();
+  await expect(card).toHaveScreenshot('product-card.png');
+});
+```
+
+```typescript Named Screenshots
+import { test, expect } from '@playwright/test';
+
+test('use descriptive names', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('homepage-desktop.png');
+});
+```
+</CodeGroup>
+
+## Screenshot Options
+
+Customize screenshot behavior with various options.
+
+<CodeGroup>
+```typescript Full Page Screenshot
+import { test, expect } from '@playwright/test';
+
+test('capture full page', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('full-page.png', {
+    fullPage: true,
+  });
+});
+```
+
+```typescript Mask Elements
+import { test, expect } from '@playwright/test';
+
+test('mask dynamic content', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('homepage.png', {
+    // Mask elements that change frequently
+    mask: [
+      page.locator('.timestamp'),
+      page.locator('.user-avatar'),
+      page.locator('.ad-banner'),
+    ],
+  });
+});
+```
+
+```typescript Clip Region
+import { test, expect } from '@playwright/test';
+
+test('screenshot specific region', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('navbar.png', {
+    clip: {
+      x: 0,
+      y: 0,
+      width: 1280,
+      height: 100,
+    },
+  });
+});
+```
+
+```typescript Omit Background
+import { test, expect } from '@playwright/test';
+
+test('transparent background', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const logo = page.locator('.logo');
+  await expect(logo).toHaveScreenshot('logo.png', {
+    omitBackground: true,
+  });
+});
+```
+</CodeGroup>
+
+## Comparison Thresholds
+
+Control the sensitivity of visual comparisons.
+
+<CodeGroup>
+```typescript Pixel Threshold
+import { test, expect } from '@playwright/test';
+
+test('allow minor differences', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('homepage.png', {
+    // Allow up to 100 pixels to differ
+    maxDiffPixels: 100,
+  });
+});
+```
+
+```typescript Percentage Threshold
+import { test, expect } from '@playwright/test';
+
+test('allow percentage difference', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('homepage.png', {
+    // Allow 0.2% of pixels to differ
+    maxDiffPixelRatio: 0.002,
+  });
+});
+```
+
+```typescript Pixel Color Threshold
+import { test, expect } from '@playwright/test';
+
+test('color difference tolerance', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('homepage.png', {
+    // Threshold for considering pixels as different (0-1)
+    threshold: 0.2,
+  });
+});
+```
+</CodeGroup>
+
+## Animation Handling
+
+Handle animations and transitions in screenshots.
+
+<CodeGroup>
+```typescript Disable Animations
+import { test, expect } from '@playwright/test';
+
+test('screenshot without animations', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot('static-page.png', {
+    animations: 'disabled',
+  });
+});
+```
+
+```typescript Wait for Animations
+import { test, expect } from '@playwright/test';
+
+test('wait for animations to complete', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Wait for animations to finish
+  await page.waitForTimeout(1000);
+  
+  await expect(page).toHaveScreenshot();
+});
+```
+
+```typescript Allow CSS Animations
+import { test, expect } from '@playwright/test';
+
+test('handle CSS animations', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await expect(page).toHaveScreenshot({
+    animations: 'allow',
+  });
+});
+```
+</CodeGroup>
+
+## Multi-Page Screenshots
+
+Compare screenshots across different page states.
+
+```typescript Page State Comparisons
+import { test, expect } from '@playwright/test';
+
+test('compare different states', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Initial state
+  await expect(page).toHaveScreenshot('state-initial.png');
+  
+  // Click button to change state
+  await page.click('button.toggle');
+  await expect(page).toHaveScreenshot('state-toggled.png');
+  
+  // Hover state
+  await page.hover('.card');
+  await expect(page).toHaveScreenshot('state-hover.png');
+});
+```
+
+## Viewport Variations
+
+Test visual consistency across different viewport sizes.
+
+<CodeGroup>
+```typescript Multiple Viewports
+import { test, expect, devices } from '@playwright/test';
+
+const viewports = [
+  { name: 'mobile', ...devices['iPhone 13'] },
+  { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop', width: 1920, height: 1080 },
+];
+
+for (const viewport of viewports) {
+  test(`visual test ${viewport.name}`, async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { 
+        width: viewport.width, 
+        height: viewport.height 
+      },
+    });
+    const page = await context.newPage();
+    
+    await page.goto('https://example.com');
+    await expect(page).toHaveScreenshot(`homepage-${viewport.name}.png`);
+    
+    await context.close();
+  });
+}
+```
+
+```typescript Responsive Screenshots
+import { test, expect } from '@playwright/test';
+
+test('responsive design screenshots', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Desktop
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect(page).toHaveScreenshot('desktop.png');
+  
+  // Tablet
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(page).toHaveScreenshot('tablet.png');
+  
+  // Mobile
+  await page.setViewportSize({ width: 375, height: 667 });
+  await expect(page).toHaveScreenshot('mobile.png');
+});
+```
+</CodeGroup>
+
+## Dark Mode Testing
+
+Compare screenshots in both light and dark themes.
+
+```typescript Theme Comparisons
+import { test, expect } from '@playwright/test';
+
+test('compare light and dark themes', async ({ browser }) => {
+  // Light mode
+  const lightContext = await browser.newContext({
+    colorScheme: 'light',
+  });
+  const lightPage = await lightContext.newPage();
+  await lightPage.goto('https://example.com');
+  await expect(lightPage).toHaveScreenshot('light-theme.png');
+  await lightContext.close();
+  
+  // Dark mode
+  const darkContext = await browser.newContext({
+    colorScheme: 'dark',
+  });
+  const darkPage = await darkContext.newPage();
+  await darkPage.goto('https://example.com');
+  await expect(darkPage).toHaveScreenshot('dark-theme.png');
+  await darkContext.close();
+});
+```
+
+## Update Snapshots
+
+Update baseline screenshots when changes are intentional.
+
+<CodeGroup>
+```bash Update All Snapshots
+# Update all snapshots
+pnpx playwright test --update-snapshots
+```
+
+```bash Update Specific Test
+# Update snapshots for specific test
+pnpx playwright test visual.spec.ts --update-snapshots
+```
+
+```bash Update in CI
+# Typically done locally, then committed
+npm run test:visual -- --update-snapshots
+git add -A
+git commit -m "Update visual snapshots"
+```
+</CodeGroup>
+
+## Cross-Browser Screenshots
+
+Ensure visual consistency across different browsers.
+
+```typescript playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+  ],
+  
+  // Each project will have its own set of snapshots
+});
+```
+
+## Diff Output
+
+Playwright generates diff images when screenshots don't match.
+
+```typescript Understanding Diff Images
+// When a test fails, Playwright creates:
+// 1. {name}-actual.png   - Current screenshot
+// 2. {name}-expected.png - Baseline screenshot  
+// 3. {name}-diff.png     - Difference highlighted
+
+// These are saved in:
+// test-results/{test-name}/
+```
+
+## Manual Screenshot Capture
+
+Capture screenshots programmatically for custom comparisons.
+
+<CodeGroup>
+```typescript Save Screenshot
+import { test } from '@playwright/test';
+import path from 'path';
+
+test('save custom screenshot', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await page.screenshot({ 
+    path: path.join('screenshots', 'custom.png'),
+    fullPage: true,
+  });
+});
+```
+
+```typescript Screenshot Buffer
+import { test } from '@playwright/test';
+
+test('get screenshot as buffer', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const buffer = await page.screenshot();
+  
+  // Use buffer for custom processing
+  console.log(`Screenshot size: ${buffer.length} bytes`);
+});
+```
+
+```typescript Element Screenshot
+import { test } from '@playwright/test';
+
+test('screenshot specific element', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const element = page.locator('.hero-section');
+  await element.screenshot({ path: 'hero.png' });
+});
+```
+</CodeGroup>
+
+## Configuration
+
+Configure screenshot defaults globally.
+
+```typescript playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  expect: {
+    toHaveScreenshot: {
+      // Default settings for all screenshot assertions
+      maxDiffPixels: 100,
+      threshold: 0.2,
+      animations: 'disabled',
+    },
+  },
+  
+  // Where to store snapshots
+  snapshotDir: './visual-snapshots',
+  
+  // Snapshot path template
+  snapshotPathTemplate: '{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}{-projectName}{ext}',
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Mask Dynamic Content" icon="mask">
+    Always mask timestamps, user-specific data, and ads that change frequently.
+  </Card>
+  
+  <Card title="Wait for Stability" icon="clock">
+    Ensure page is fully loaded and stable before taking screenshots. Wait for network idle.
+  </Card>
+  
+  <Card title="Appropriate Thresholds" icon="sliders">
+    Set reasonable thresholds - too strict causes false positives, too loose misses issues.
+  </Card>
+  
+  <Card title="Organized Snapshots" icon="folder-tree">
+    Use descriptive names and organize snapshots by feature or component.
+  </Card>
+</CardGroup>
+
+<Warning>
+Visual tests can be flaky due to font rendering differences across platforms. Consider running them in Docker or CI with consistent environments.
+</Warning>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Screenshots" icon="camera" href="/essentials/screenshots">
+    Learn more about screenshot capabilities
+  </Card>
+  
+  <Card title="Visual Debugging" icon="bug" href="/essentials/debugging">
+    Debug visual test failures effectively
+  </Card>
+</CardGroup>

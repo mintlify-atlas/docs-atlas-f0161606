@@ -1,0 +1,655 @@
+---
+title: 'Test Configuration'
+description: 'Configuration options for Playwright Test including projects, browsers, timeouts, and reporting'
+---
+
+# Test Configuration
+
+Playwright Test is configured through a configuration file (`playwright.config.ts` or `playwright.config.js`) that defines how tests are run, which browsers to use, and various other options.
+
+## Importing
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  // Configuration options
+});
+```
+
+## Basic Configuration
+
+### Example Configuration
+
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  timeout: 30000,
+  retries: 2,
+  workers: 4,
+  
+  use: {
+    baseURL: 'http://localhost:3000',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+  ],
+});
+```
+
+## Configuration Interface
+
+### TestConfig
+
+Main configuration interface for Playwright Test.
+
+```typescript
+interface TestConfig<TestArgs = {}, WorkerArgs = {}> {
+  // Test execution
+  testDir?: string;
+  testMatch?: string | RegExp | Array<string | RegExp>;
+  testIgnore?: string | RegExp | Array<string | RegExp>;
+  timeout?: number;
+  globalTimeout?: number;
+  expect?: ExpectConfig;
+  
+  // Parallelization
+  workers?: number | string;
+  fullyParallel?: boolean;
+  
+  // Retries and failures
+  retries?: number;
+  maxFailures?: number;
+  forbidOnly?: boolean;
+  
+  // Output and reporting
+  outputDir?: string;
+  reporter?: ReporterDescription[];
+  reportSlowTests?: { max: number; threshold: number } | null;
+  quiet?: boolean;
+  preserveOutput?: 'always' | 'never' | 'failures-only';
+  
+  // Snapshots
+  snapshotDir?: string;
+  snapshotPathTemplate?: string;
+  updateSnapshots?: 'all' | 'none' | 'missing';
+  ignoreSnapshots?: boolean;
+  
+  // Filtering
+  grep?: RegExp | RegExp[];
+  grepInvert?: RegExp | RegExp[];
+  
+  // Projects
+  projects?: Project<TestArgs, WorkerArgs>[];
+  
+  // Global hooks
+  globalSetup?: string | string[];
+  globalTeardown?: string | string[];
+  
+  // Web server
+  webServer?: WebServer | WebServer[];
+  
+  // Options
+  use?: UseOptions<TestArgs, WorkerArgs>;
+  
+  // Metadata
+  metadata?: Metadata;
+  name?: string;
+  
+  // Other
+  shard?: { total: number; current: number } | null;
+}
+```
+
+## Test Execution Options
+
+### testDir
+
+<ParamField path="testDir" type="string" default=".">
+  Directory where test files are located. All test files matching `testMatch` pattern will be executed.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  testDir: './e2e',
+});
+```
+
+### testMatch
+
+<ParamField path="testMatch" type="string | RegExp | Array<string | RegExp>" default="**/*.@(spec|test).?(c|m)[jt]s?(x)">
+  Pattern(s) to match test files.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  testMatch: '**/*.spec.ts',
+  // or multiple patterns
+  testMatch: ['**/*.test.ts', '**/*.spec.ts'],
+});
+```
+
+### testIgnore
+
+<ParamField path="testIgnore" type="string | RegExp | Array<string | RegExp>" default="[]">
+  Pattern(s) to ignore when looking for test files.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  testIgnore: '**/node_modules/**',
+});
+```
+
+### timeout
+
+<ParamField path="timeout" type="number" default="30000">
+  Maximum time in milliseconds for a single test. Use 0 to disable timeout.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  timeout: 60000, // 60 seconds
+});
+```
+
+### globalTimeout
+
+<ParamField path="globalTimeout" type="number" default="0">
+  Maximum time in milliseconds for the entire test run. Use 0 to disable.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  globalTimeout: 3600000, // 1 hour
+});
+```
+
+## Parallelization Options
+
+### workers
+
+<ParamField path="workers" type="number | string" default="'50%'">
+  Maximum number of concurrent worker processes. Can be a number or percentage string.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  workers: 4,
+  // or
+  workers: '50%', // Use 50% of CPU cores
+});
+```
+
+### fullyParallel
+
+<ParamField path="fullyParallel" type="boolean" default="false">
+  Run all tests in all files in parallel. By default, test files run in parallel but tests within a file run serially.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  fullyParallel: true,
+});
+```
+
+## Retry and Failure Options
+
+### retries
+
+<ParamField path="retries" type="number" default="0">
+  Number of times to retry failed tests.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  retries: process.env.CI ? 2 : 0,
+});
+```
+
+### maxFailures
+
+<ParamField path="maxFailures" type="number" default="0">
+  Maximum number of test failures before stopping the test run. Use 0 to disable.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  maxFailures: process.env.CI ? 10 : 0,
+});
+```
+
+### forbidOnly
+
+<ParamField path="forbidOnly" type="boolean" default="false">
+  Whether to fail if any tests are marked as `test.only()`. Useful for CI.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  forbidOnly: !!process.env.CI,
+});
+```
+
+### failOnFlakyTests
+
+<ParamField path="failOnFlakyTests" type="boolean" default="false">
+  Whether to fail if any tests are flaky (passed after retry). Useful for CI.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  failOnFlakyTests: !!process.env.CI,
+});
+```
+
+## Output and Reporting
+
+### outputDir
+
+<ParamField path="outputDir" type="string" default="'test-results'">
+  Directory for test artifacts like screenshots, videos, and traces.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  outputDir: './test-results',
+});
+```
+
+### reporter
+
+<ParamField path="reporter" type="ReporterDescription[]" default="'list'">
+  Test reporters to use. Can be built-in reporters or custom reporter modules.
+</ParamField>
+
+**Built-in Reporters:** `'list'`, `'dot'`, `'line'`, `'github'`, `'json'`, `'junit'`, `'html'`, `'blob'`
+
+```typescript
+export default defineConfig({
+  reporter: [
+    ['html', { outputFolder: 'playwright-report' }],
+    ['json', { outputFile: 'test-results.json' }],
+    ['junit', { outputFile: 'junit.xml' }],
+  ],
+});
+```
+
+### reportSlowTests
+
+<ParamField path="reportSlowTests" type="{ max: number; threshold: number } | null" default="{ max: 5, threshold: 15000 }">
+  Report slow test files. Set to `null` to disable.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  reportSlowTests: {
+    max: 10,      // Report up to 10 slow test files
+    threshold: 30000  // Files taking more than 30s
+  },
+});
+```
+
+### quiet
+
+<ParamField path="quiet" type="boolean" default="false">
+  Whether to suppress stdio output from tests.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  quiet: true,
+});
+```
+
+## Use Options
+
+The `use` section configures the browser context and test options.
+
+### Browser Options
+
+<ParamField path="use.browserName" type="'chromium' | 'firefox' | 'webkit'" default="'chromium'">
+  Browser to use for tests.
+</ParamField>
+
+<ParamField path="use.headless" type="boolean" default="true">
+  Whether to run browser in headless mode.
+</ParamField>
+
+<ParamField path="use.channel" type="string">
+  Browser channel to use (e.g., 'chrome', 'msedge').
+</ParamField>
+
+```typescript
+export default defineConfig({
+  use: {
+    browserName: 'chromium',
+    headless: true,
+    channel: 'chrome',
+  },
+});
+```
+
+### Context Options
+
+<ParamField path="use.baseURL" type="string">
+  Base URL for `page.goto()`. Relative URLs will be resolved against this.
+</ParamField>
+
+<ParamField path="use.viewport" type="{ width: number; height: number } | null" default="{ width: 1280, height: 720 }">
+  Browser viewport size. Set to `null` to disable fixed viewport.
+</ParamField>
+
+<ParamField path="use.userAgent" type="string">
+  Custom user agent string.
+</ParamField>
+
+<ParamField path="use.locale" type="string" default="'en-US'">
+  Browser locale.
+</ParamField>
+
+<ParamField path="use.timezoneId" type="string">
+  Timezone identifier (e.g., 'America/New_York').
+</ParamField>
+
+```typescript
+export default defineConfig({
+  use: {
+    baseURL: 'http://localhost:3000',
+    viewport: { width: 1920, height: 1080 },
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+  },
+});
+```
+
+### Network Options
+
+<ParamField path="use.ignoreHTTPSErrors" type="boolean" default="false">
+  Whether to ignore HTTPS errors.
+</ParamField>
+
+<ParamField path="use.offline" type="boolean" default="false">
+  Simulate offline network.
+</ParamField>
+
+<ParamField path="use.proxy" type="{ server: string; bypass?: string; username?: string; password?: string }">
+  Network proxy settings.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  use: {
+    ignoreHTTPSErrors: true,
+    proxy: {
+      server: 'http://proxy.example.com:8080',
+      bypass: 'localhost',
+    },
+  },
+});
+```
+
+### Recording Options
+
+<ParamField path="use.screenshot" type="'off' | 'on' | 'only-on-failure' | 'on-first-failure'" default="'off'">
+  When to capture screenshots.
+</ParamField>
+
+<ParamField path="use.video" type="'off' | 'on' | 'retain-on-failure' | 'on-first-retry'" default="'off'">
+  When to record videos.
+</ParamField>
+
+<ParamField path="use.trace" type="'off' | 'on' | 'retain-on-failure' | 'on-first-retry'" default="'off'">
+  When to record traces.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  use: {
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'on-first-retry',
+  },
+});
+```
+
+### Agent Options
+
+<ParamField path="use.agentOptions" type="AgentOptions">
+  Configuration for AI agent fixture.
+</ParamField>
+
+```typescript
+interface AgentOptions {
+  provider?: {
+    api: 'openai' | 'anthropic' | 'google' | 'openai-compatible';
+    apiKey: string;
+    model: string;
+    apiEndpoint?: string;
+    apiTimeout?: number;
+  };
+  limits?: {
+    maxTokens?: number;
+    maxActions?: number;
+    maxActionRetries?: number;
+  };
+  cachePathTemplate?: string;
+  systemPrompt?: string;
+  secrets?: Record<string, string>;
+}
+```
+
+**Example:**
+
+```typescript
+export default defineConfig({
+  use: {
+    agentOptions: {
+      provider: {
+        api: 'openai',
+        apiKey: process.env.OPENAI_API_KEY!,
+        model: 'gpt-4',
+      },
+      limits: {
+        maxActions: 50,
+      },
+    },
+  },
+});
+```
+
+## Project Configuration
+
+Define multiple projects to run tests in different configurations.
+
+```typescript
+export default defineConfig({
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'mobile-safari',
+      use: { ...devices['iPhone 13'] },
+    },
+  ],
+});
+```
+
+### Project Dependencies
+
+```typescript
+export default defineConfig({
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /global\.setup\.ts/,
+    },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+    },
+  ],
+});
+```
+
+### Project Teardown
+
+```typescript
+export default defineConfig({
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      teardown: 'cleanup',
+    },
+    {
+      name: 'cleanup',
+      testMatch: /global\.teardown\.ts/,
+    },
+  ],
+});
+```
+
+## Global Hooks
+
+### globalSetup
+
+<ParamField path="globalSetup" type="string | string[]">
+  Path to global setup file(s) that run before all tests.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  globalSetup: './global-setup.ts',
+});
+```
+
+**global-setup.ts:**
+
+```typescript
+import { FullConfig } from '@playwright/test';
+
+export default async function globalSetup(config: FullConfig) {
+  // Start database, servers, etc.
+  console.log('Running global setup');
+}
+```
+
+### globalTeardown
+
+<ParamField path="globalTeardown" type="string | string[]">
+  Path to global teardown file(s) that run after all tests.
+</ParamField>
+
+```typescript
+export default defineConfig({
+  globalTeardown: './global-teardown.ts',
+});
+```
+
+## Web Server
+
+Start a development server before running tests.
+
+<ParamField path="webServer" type="WebServer | WebServer[]">
+  Configuration for starting a web server.
+</ParamField>
+
+```typescript
+interface WebServer {
+  command: string;
+  url: string;
+  timeout?: number;
+  reuseExistingServer?: boolean;
+  cwd?: string;
+  env?: Record<string, string>;
+  ignoreHTTPSErrors?: boolean;
+}
+```
+
+**Example:**
+
+```typescript
+export default defineConfig({
+  webServer: {
+    command: 'npm run start',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
+});
+```
+
+## Expect Configuration
+
+Configure assertion behavior.
+
+```typescript
+export default defineConfig({
+  expect: {
+    timeout: 5000,
+    toHaveScreenshot: {
+      threshold: 0.2,
+      maxDiffPixels: 100,
+    },
+    toMatchSnapshot: {
+      threshold: 0.3,
+    },
+  },
+});
+```
+
+## TypeScript Definitions
+
+```typescript
+function defineConfig<T = {}, W = {}>(config: TestConfig<T, W>): TestConfig<T, W>;
+function defineConfig(config: TestConfig): TestConfig;
+
+interface FullConfig extends TestConfig {
+  version: string;
+  configFile?: string;
+  rootDir: string;
+  projects: FullProject[];
+}
+
+interface FullProject {
+  name: string;
+  testDir: string;
+  outputDir: string;
+  use: UseOptions;
+  // ... other resolved options
+}
+```
+
+## See Also
+
+- [Test API](/api/test) - Test functions and methods
+- [Test Fixtures](/api/test-fixtures) - Built-in fixtures
+- [Configuration Guide](/guides/configuration) - Detailed configuration examples

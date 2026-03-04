@@ -1,0 +1,186 @@
+---
+title: WebSocket
+description: API reference for the Playwright WebSocket class for monitoring WebSocket connections.
+---
+
+The WebSocket class represents WebSocket connections established by pages. WebSocket instances are emitted via the `page.on('websocket')` event.
+
+## Methods
+
+### url
+
+Returns the URL of the WebSocket.
+
+```javascript
+const url = webSocket.url();
+console.log(url);
+```
+
+**Returns:** `string`
+
+---
+
+### isClosed
+
+Returns whether the WebSocket has been closed.
+
+```javascript
+if (webSocket.isClosed()) {
+  console.log('WebSocket is closed');
+}
+```
+
+**Returns:** `boolean`
+
+---
+
+### waitForEvent
+
+Waits for a specific event to be emitted.
+
+```javascript
+const frame = await webSocket.waitForEvent('framesent');
+console.log('Frame sent:', frame.payload);
+```
+
+<ParamField path="event" type="string" required>
+  Event name. Can be:
+  - `framesent` - Emitted when a frame is sent
+  - `framereceived` - Emitted when a frame is received
+  - `close` - Emitted when the WebSocket closes
+  - `socketerror` - Emitted when a socket error occurs
+</ParamField>
+
+<ParamField path="options.predicate" type="function">
+  Optional predicate function to filter events.
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time to wait in milliseconds. Defaults to 30000 (30 seconds).
+</ParamField>
+
+**Returns:** `Promise<any>`
+
+## Events
+
+### framesent
+
+Emitted when a WebSocket frame is sent from the page.
+
+```javascript
+webSocket.on('framesent', frame => {
+  console.log('Sent:', frame.payload);
+});
+```
+
+Event payload:
+- `payload`: string | Buffer - The frame payload
+
+---
+
+### framereceived
+
+Emitted when a WebSocket frame is received by the page.
+
+```javascript
+webSocket.on('framereceived', frame => {
+  console.log('Received:', frame.payload);
+});
+```
+
+Event payload:
+- `payload`: string | Buffer - The frame payload
+
+---
+
+### close
+
+Emitted when the WebSocket is closed.
+
+```javascript
+webSocket.on('close', () => {
+  console.log('WebSocket closed');
+});
+```
+
+---
+
+### socketerror
+
+Emitted when a socket error occurs.
+
+```javascript
+webSocket.on('socketerror', error => {
+  console.log('Socket error:', error);
+});
+```
+
+## Example Usage
+
+### Monitor WebSocket Messages
+
+```javascript
+page.on('websocket', ws => {
+  console.log('WebSocket opened:', ws.url());
+  
+  ws.on('framesent', frame => {
+    console.log('→', frame.payload);
+  });
+  
+  ws.on('framereceived', frame => {
+    console.log('←', frame.payload);
+  });
+  
+  ws.on('close', () => {
+    console.log('WebSocket closed');
+  });
+});
+```
+
+### Filter WebSocket Messages
+
+```javascript
+page.on('websocket', ws => {
+  if (ws.url().includes('api.example.com')) {
+    ws.on('framereceived', frame => {
+      if (typeof frame.payload === 'string') {
+        const data = JSON.parse(frame.payload);
+        console.log('Received data:', data);
+      }
+    });
+  }
+});
+```
+
+### Wait for Specific Message
+
+```javascript
+const ws = await page.waitForEvent('websocket', ws => 
+  ws.url().includes('chat.example.com')
+);
+
+const frame = await ws.waitForEvent('framereceived', {
+  predicate: frame => {
+    if (typeof frame.payload === 'string') {
+      return frame.payload.includes('welcome');
+    }
+    return false;
+  }
+});
+
+console.log('Welcome message received:', frame.payload);
+```
+
+### Handle WebSocket Errors
+
+```javascript
+page.on('websocket', ws => {
+  ws.on('socketerror', error => {
+    console.error('WebSocket error:', error);
+  });
+  
+  ws.on('close', () => {
+    console.log('WebSocket connection closed');
+  });
+});
+```

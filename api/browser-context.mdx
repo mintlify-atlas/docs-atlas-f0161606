@@ -1,0 +1,539 @@
+---
+title: BrowserContext
+description: API reference for the BrowserContext class - isolated browser sessions
+---
+
+BrowserContext provides isolated sessions within a browser. Each context has its own cookies, cache, and storage.
+
+## Inheritance
+
+Extends: `ChannelOwner`
+
+Implements: `EventEmitter`
+
+## Events
+
+- `page`: Emitted when a new page is created
+- `close`: Emitted when context is closed
+- `request`: Emitted when a request is made
+- `response`: Emitted when a response is received
+- `requestfailed`: Emitted when a request fails
+- `requestfinished`: Emitted when a request finishes
+- `console`: Emitted when console message is logged
+- `dialog`: Emitted when a dialog appears
+- `weberror`: Emitted when uncaught exception occurs
+- `serviceworker`: Emitted when service worker is created
+
+## Properties
+
+### request
+
+<ParamField path="request" type="APIRequestContext">
+  API request context for making HTTP requests.
+</ParamField>
+
+### tracing
+
+<ParamField path="tracing" type="Tracing">
+  Tracing instance for recording traces.
+</ParamField>
+
+### clock
+
+<ParamField path="clock" type="Clock">
+  Clock instance for controlling time.
+</ParamField>
+
+## Methods
+
+### browser
+
+Returns the browser that owns this context.
+
+```typescript
+browser(): Browser | null
+```
+
+**Returns:** `Browser | null` - Parent browser or null for persistent contexts
+
+### pages
+
+Returns all open pages in this context.
+
+```typescript
+pages(): Page[]
+```
+
+**Returns:** `Page[]` - Array of pages
+
+### newPage
+
+Creates a new page in this context.
+
+```typescript
+newPage(): Promise<Page>
+```
+
+**Returns:** `Promise<Page>` - New page
+
+### cookies
+
+Returns cookies.
+
+```typescript
+cookies(urls?: string | string[]): Promise<Cookie[]>
+```
+
+<ParamField path="urls" type="string | string[]" optional>
+  URL(s) to get cookies for. If not specified, returns all cookies.
+</ParamField>
+
+**Returns:** `Promise<Cookie[]>` - Array of cookies
+
+### addCookies
+
+Adds cookies to the context.
+
+```typescript
+addCookies(cookies: Cookie[]): Promise<void>
+```
+
+<ParamField path="cookies" type="Cookie[]" required>
+  Array of cookie objects to add
+  
+  Each cookie should have:
+  - `name` (string): Cookie name
+  - `value` (string): Cookie value
+  - `url` or `domain` (string): Cookie domain
+  - `path` (string, optional): Cookie path
+  - `expires` (number, optional): Expiration timestamp
+  - `httpOnly` (boolean, optional): HTTP only flag
+  - `secure` (boolean, optional): Secure flag
+  - `sameSite` ('Strict' | 'Lax' | 'None', optional): SameSite attribute
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### clearCookies
+
+Clears cookies.
+
+```typescript
+clearCookies(options?: ClearCookiesOptions): Promise<void>
+```
+
+<ParamField path="options" type="ClearCookiesOptions" optional>
+  Cookie filter options
+  
+  - `name` (string | RegExp): Cookie name or pattern
+  - `domain` (string | RegExp): Cookie domain or pattern
+  - `path` (string | RegExp): Cookie path or pattern
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### setDefaultNavigationTimeout
+
+Sets default navigation timeout.
+
+```typescript
+setDefaultNavigationTimeout(timeout: number): void
+```
+
+<ParamField path="timeout" type="number" required>
+  Timeout in milliseconds (0 to disable)
+</ParamField>
+
+### setDefaultTimeout
+
+Sets default timeout for all operations.
+
+```typescript
+setDefaultTimeout(timeout: number): void
+```
+
+<ParamField path="timeout" type="number" required>
+  Timeout in milliseconds (0 to disable)
+</ParamField>
+
+### grantPermissions
+
+Grants specified permissions.
+
+```typescript
+grantPermissions(permissions: string[], options?: { origin?: string }): Promise<void>
+```
+
+<ParamField path="permissions" type="string[]" required>
+  Permissions to grant (e.g., 'geolocation', 'notifications')
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `origin` (string): Origin to grant permissions to
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### clearPermissions
+
+Clears all granted permissions.
+
+```typescript
+clearPermissions(): Promise<void>
+```
+
+**Returns:** `Promise<void>`
+
+### setGeolocation
+
+Sets geolocation.
+
+```typescript
+setGeolocation(geolocation: { longitude: number, latitude: number, accuracy?: number } | null): Promise<void>
+```
+
+<ParamField path="geolocation" type="object | null" required>
+  Geolocation coordinates or null to clear
+  
+  - `latitude` (number): Latitude
+  - `longitude` (number): Longitude
+  - `accuracy` (number, optional): Accuracy in meters
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### setExtraHTTPHeaders
+
+Sets extra HTTP headers.
+
+```typescript
+setExtraHTTPHeaders(headers: Headers): Promise<void>
+```
+
+<ParamField path="headers" type="Headers" required>
+  HTTP headers object
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### setOffline
+
+Sets offline mode.
+
+```typescript
+setOffline(offline: boolean): Promise<void>
+```
+
+<ParamField path="offline" type="boolean" required>
+  Whether to enable offline mode
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### setHTTPCredentials
+
+Sets HTTP credentials for authentication.
+
+```typescript
+setHTTPCredentials(httpCredentials: { username: string, password: string } | null): Promise<void>
+```
+
+<ParamField path="httpCredentials" type="object | null" required>
+  Credentials or null to clear
+  
+  - `username` (string): Username
+  - `password` (string): Password
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### addInitScript
+
+Adds a script to evaluate in every page.
+
+```typescript
+addInitScript(script: Function | string | { path?: string, content?: string }, arg?: any): Promise<void>
+```
+
+<ParamField path="script" type="Function | string | object" required>
+  Script to evaluate
+</ParamField>
+
+<ParamField path="arg" type="any" optional>
+  Argument to pass to the script
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### exposeBinding
+
+Exposes a binding.
+
+```typescript
+exposeBinding(name: string, callback: Function, options?: { handle?: boolean }): Promise<void>
+```
+
+<ParamField path="name" type="string" required>
+  Binding name
+</ParamField>
+
+<ParamField path="callback" type="Function" required>
+  Callback function
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `handle` (boolean): Pass JSHandle instead of value
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### exposeFunction
+
+Exposes a function.
+
+```typescript
+exposeFunction(name: string, callback: Function): Promise<void>
+```
+
+<ParamField path="name" type="string" required>
+  Function name
+</ParamField>
+
+<ParamField path="callback" type="Function" required>
+  Function to expose
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### route
+
+Routes matching URLs to a handler.
+
+```typescript
+route(url: string | RegExp, handler: Function, options?: { times?: number }): Promise<void>
+```
+
+<ParamField path="url" type="string | RegExp" required>
+  URL pattern to match
+</ParamField>
+
+<ParamField path="handler" type="Function" required>
+  Route handler function
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  - `times` (number): Maximum number of times to handle
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### unroute
+
+Removes a route.
+
+```typescript
+unroute(url: string | RegExp, handler?: Function): Promise<void>
+```
+
+<ParamField path="url" type="string | RegExp" required>
+  URL pattern
+</ParamField>
+
+<ParamField path="handler" type="Function" optional>
+  Handler to remove (removes all if not specified)
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### unrouteAll
+
+Removes all routes.
+
+```typescript
+unrouteAll(options?: { behavior?: 'wait' | 'ignoreErrors' | 'default' }): Promise<void>
+```
+
+<ParamField path="options" type="object" optional>
+  - `behavior` (string): How to handle pending routes
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### routeFromHAR
+
+Routes requests from a HAR file.
+
+```typescript
+routeFromHAR(har: string, options?: RouteFromHAROptions): Promise<void>
+```
+
+<ParamField path="har" type="string" required>
+  Path to HAR file
+</ParamField>
+
+<ParamField path="options" type="RouteFromHAROptions" optional>
+  HAR routing options
+  
+  - `url` (string | RegExp): URL pattern to match
+  - `notFound` ('abort' | 'fallback'): Action when request not found
+  - `update` (boolean): Update HAR file with new requests
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### storageState
+
+Returns storage state.
+
+```typescript
+storageState(options?: { path?: string }): Promise<StorageState>
+```
+
+<ParamField path="options" type="object" optional>
+  - `path` (string): File path to save storage state to
+</ParamField>
+
+**Returns:** `Promise<StorageState>` - Storage state object
+
+### waitForEvent
+
+Waits for an event.
+
+```typescript
+waitForEvent(event: string, optionsOrPredicate?: WaitForEventOptions | Function): Promise<any>
+```
+
+<ParamField path="event" type="string" required>
+  Event name
+</ParamField>
+
+<ParamField path="optionsOrPredicate" type="WaitForEventOptions | Function" optional>
+  Options or predicate function
+</ParamField>
+
+**Returns:** `Promise<any>` - Event data
+
+### close
+
+Closes the context.
+
+```typescript
+close(options?: { reason?: string }): Promise<void>
+```
+
+<ParamField path="options" type="object" optional>
+  - `reason` (string): Close reason
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### newCDPSession
+
+Creates a CDP session.
+
+```typescript
+newCDPSession(page: Page | Frame): Promise<CDPSession>
+```
+
+<ParamField path="page" type="Page | Frame" required>
+  Page or frame to attach to
+</ParamField>
+
+**Returns:** `Promise<CDPSession>` - CDP session
+
+### serviceWorkers
+
+Returns all service workers.
+
+```typescript
+serviceWorkers(): Worker[]
+```
+
+**Returns:** `Worker[]` - Array of service workers
+
+## Usage Examples
+
+### Basic Context Usage
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+const context = await browser.newContext({
+  viewport: { width: 1280, height: 720 },
+  userAgent: 'My User Agent',
+});
+
+const page = await context.newPage();
+await page.goto('https://example.com');
+
+await context.close();
+await browser.close();
+```
+
+### Cookie Management
+
+```typescript
+const context = await browser.newContext();
+
+// Add cookies
+await context.addCookies([
+  {
+    name: 'session',
+    value: 'abc123',
+    domain: 'example.com',
+    path: '/',
+  },
+]);
+
+// Get cookies
+const cookies = await context.cookies();
+console.log(cookies);
+
+// Clear cookies
+await context.clearCookies();
+```
+
+### Request Interception
+
+```typescript
+const context = await browser.newContext();
+
+await context.route('**/*.{png,jpg,jpeg}', async (route) => {
+  await route.abort();
+});
+
+await context.route('**/api/*', async (route) => {
+  await route.fulfill({
+    status: 200,
+    body: JSON.stringify({ mocked: true }),
+  });
+});
+
+const page = await context.newPage();
+```
+
+### Storage State Persistence
+
+```typescript
+// Save storage state
+const context = await browser.newContext();
+const page = await context.newPage();
+await page.goto('https://example.com');
+// ... perform login ...
+await context.storageState({ path: 'state.json' });
+await context.close();
+
+// Restore storage state
+const newContext = await browser.newContext({
+  storageState: 'state.json',
+});
+const newPage = await newContext.newPage();
+// User is logged in
+```
+
+## Related Classes
+
+- [Browser](/api/browser) - Parent browser
+- [Page](/api/page) - Pages in context
+- [Tracing](/api/tracing) - Trace recording

@@ -1,0 +1,543 @@
+---
+title: Test Isolation
+description: Understanding test isolation principles and how Playwright ensures independent, reliable tests
+---
+
+## What is Test Isolation?
+
+Test isolation ensures that each test runs independently without affecting or being affected by other tests. This is critical for reliable, maintainable test suites.
+
+<Note>
+Isolated tests can run in any order, in parallel, and produce consistent results.
+</Note>
+
+## Why Isolation Matters
+
+<CardGroup cols={2}>
+  <Card title="Reliability" icon="shield-check">
+    Tests don't fail due to side effects from other tests
+  </Card>
+  <Card title="Parallelization" icon="rocket">
+    Tests can run simultaneously without conflicts
+  </Card>
+  <Card title="Debugging" icon="bug">
+    Failures are easier to debug when tests are independent
+  </Card>
+  <Card title="Maintainability" icon="wrench">
+    Tests can be modified without breaking others
+  </Card>
+</CardGroup>
+
+## Browser Context Isolation
+
+Playwright uses **BrowserContext** for test isolation:
+
+```javascript
+const browser = await chromium.launch();
+
+// Test 1 - Isolated context
+const context1 = await browser.newContext();
+const page1 = await context1.newPage();
+await page1.goto('https://example.com');
+await context1.close();
+
+// Test 2 - Fresh isolated context
+const context2 = await browser.newContext();
+const page2 = await context2.newPage();
+await page2.goto('https://example.com');
+await context2.close();
+```
+
+From client/browserContext.ts:58-174, each context provides:
+- **Independent cookies**
+- **Separate localStorage/sessionStorage**
+- **Isolated cache**
+- **Independent network state**
+- **Separate permissions**
+
+## Test Isolation Pattern
+
+### Recommended Pattern
+
+```javascript
+import { test } from '@playwright/test';
+
+test('user can login', async ({ page }) => {
+  // Fresh page for this test
+  await page.goto('https://example.com/login');
+  await page.fill('#username', 'user');
+  await page.fill('#password', 'pass');
+  await page.click('#login');
+  
+  await expect(page).toHaveURL('**/dashboard');
+});
+
+test('user can register', async ({ page }) => {
+  // Completely fresh page, no state from previous test
+  await page.goto('https://example.com/register');
+  await page.fill('#username', 'newuser');
+  await page.fill('#email', 'user@example.com');
+  await page.click('#register');
+  
+  await expect(page).toHaveURL('**/welcome');
+});
+```
+
+<Tip>
+The `{ page }` fixture automatically creates a fresh browser context and page for each test.
+</Tip>
+
+### Manual Context Management
+
+```javascript
+const browser = await chromium.launch();
+
+for (const testCase of testCases) {
+  // Create fresh context for each test
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  
+  try {
+    await runTest(page, testCase);
+  } finally {
+    // Always clean up
+    await context.close();
+  }
+}
+
+await browser.close();
+```
+
+## Context Lifecycle
+
+From client/browser.ts:58-90:
+
+```typescript
+async newContext(options: BrowserContextOptions = {}): Promise<BrowserContext> {
+  // Prepare options with selectors
+  const options = this._browserType._playwright.selectors._withSelectorOptions(userOptions);
+  
+  // Run before-create hooks
+  await this._instrumentation.runBeforeCreateBrowserContext(options);
+  
+  // Create context on server
+  const contextOptions = await prepareBrowserContextParams(this._platform, options);
+  const response = await this._channel.newContext(contextOptions);
+  
+  // Get context proxy
+  const context = BrowserContext.from(response.context);
+  
+  // Run after-create hooks
+  await this._instrumentation.runAfterCreateBrowserContext(context);
+  
+  return context;
+}
+```
+
+Each context is:
+1. **Created fresh** - No shared state
+2. **Configured independently** - Own options
+3. **Tracked separately** - Independent lifecycle
+4. **Closed cleanly** - Resources released
+
+## State Management
+
+### Cookies
+
+Cookies are isolated per context:
+
+```javascript
+// Test 1
+const context1 = await browser.newContext();
+const page1 = await context1.newPage();
+await page1.goto('https://example.com');
+await context1.addCookies([{ name: 'session', value: 'abc', domain: 'example.com', path: '/' }]);
+
+// Test 2 - No cookies from Test 1
+const context2 = await browser.newContext();
+const page2 = await context2.newPage();
+await page2.goto('https://example.com');
+const cookies = await context2.cookies();
+console.log(cookies.length); // 0
+```
+
+### Storage
+
+localStorage and sessionStorage are isolated:
+
+```javascript
+// Test 1
+const context1 = await browser.newContext();
+const page1 = await context1.newPage();
+await page1.goto('https://example.com');
+await page1.evaluate(() => {
+  localStorage.setItem('key', 'value1');
+});
+
+// Test 2 - Independent storage
+const context2 = await browser.newContext();
+const page2 = await context2.newPage();
+await page2.goto('https://example.com');
+const value = await page2.evaluate(() => {
+  return localStorage.getItem('key');
+});
+console.log(value); // null
+```
+
+### Network State
+
+Each context has independent network state:
+
+```javascript
+// Test 1 - Offline
+const context1 = await browser.newContext();
+await context1.setOffline(true);
+
+// Test 2 - Online
+const context2 = await browser.newContext();
+// Online by default
+```
+
+## Sharing State (When Needed)
+
+### Storage State
+
+Sometimes you want to share authentication state:
+
+```javascript
+// Setup: Login once
+const setupContext = await browser.newContext();
+const page = await setupContext.newPage();
+await page.goto('https://example.com/login');
+await page.fill('#username', 'user');
+await page.fill('#password', 'pass');
+await page.click('#login');
+
+// Save state
+const storageState = await setupContext.storageState();
+await setupContext.close();
+
+// Test 1: Reuse auth state
+const context1 = await browser.newContext({ storageState });
+const page1 = await context1.newPage();
+await page1.goto('https://example.com/dashboard');
+// Already logged in!
+
+// Test 2: Also reuse auth state
+const context2 = await browser.newContext({ storageState });
+const page2 = await context2.newPage();
+await page2.goto('https://example.com/profile');
+// Also logged in!
+```
+
+<Note>
+Even when sharing auth state, contexts remain isolated for other state (new cookies, localStorage changes, etc.).
+</Note>
+
+### Persistent Context
+
+For development/debugging, use persistent context:
+
+```javascript
+const context = await chromium.launchPersistentContext('./user-data', {
+  headless: false
+});
+
+// State persists across runs
+const page = await context.newPage();
+```
+
+<Warning>
+Don't use persistent context for tests. It breaks isolation.
+</Warning>
+
+## Resource Cleanup
+
+### Automatic Cleanup
+
+Playwright Test automatically cleans up:
+
+```javascript
+import { test } from '@playwright/test';
+
+test('my test', async ({ page, context }) => {
+  // Use page and context
+  await page.goto('https://example.com');
+  
+  // Automatically closed after test
+});
+```
+
+### Manual Cleanup
+
+```javascript
+const browser = await chromium.launch();
+const context = await browser.newContext();
+const page = await context.newPage();
+
+try {
+  await page.goto('https://example.com');
+  // ... test code ...
+} finally {
+  // Always clean up
+  await page.close();
+  await context.close();
+  await browser.close();
+}
+```
+
+### Async Disposal
+
+```javascript
+const browser = await chromium.launch();
+try {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto('https://example.com');
+  } finally {
+    await context.close();
+  }
+} finally {
+  await browser.close();
+}
+
+// Or with Symbol.asyncDispose (modern)
+await using browser = await chromium.launch();
+await using context = await browser.newContext();
+await using page = await context.newPage();
+// Automatically closed
+```
+
+From client/browser.ts:172-174:
+
+```typescript
+async [Symbol.asyncDispose]() {
+  await this.close();
+}
+```
+
+## Parallel Testing
+
+Isolation enables parallel test execution:
+
+```javascript
+import { test } from '@playwright/test';
+
+// These run in parallel, completely isolated
+test('test 1', async ({ page }) => {
+  await page.goto('https://example.com');
+});
+
+test('test 2', async ({ page }) => {
+  await page.goto('https://example.com');
+});
+
+test('test 3', async ({ page }) => {
+  await page.goto('https://example.com');
+});
+```
+
+With configuration:
+
+```javascript
+// playwright.config.js
+export default {
+  workers: 4,  // Run 4 tests in parallel
+  fullyParallel: true
+};
+```
+
+## Common Pitfalls
+
+### Sharing Browser Context
+
+```javascript
+// BAD: Sharing context between tests
+const context = await browser.newContext();
+
+test('test 1', async () => {
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+  // Sets cookies that affect test 2
+});
+
+test('test 2', async () => {
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+  // Has cookies from test 1!
+});
+
+// GOOD: Fresh context per test
+test('test 1', async ({ context }) => {
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+});
+
+test('test 2', async ({ context }) => {
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+});
+```
+
+### Global State
+
+```javascript
+// BAD: Global state
+let userId;
+
+test('create user', async ({ page }) => {
+  userId = await createUser(page);
+});
+
+test('delete user', async ({ page }) => {
+  await deleteUser(page, userId); // Depends on previous test!
+});
+
+// GOOD: Independent tests
+test('create and delete user', async ({ page }) => {
+  const userId = await createUser(page);
+  await deleteUser(page, userId);
+});
+
+test('user operations', async ({ page }) => {
+  const userId = await createUser(page);
+  // Use userId in this test
+  await deleteUser(page, userId);
+});
+```
+
+### Test Order Dependencies
+
+```javascript
+// BAD: Order-dependent tests
+test('login', async ({ page }) => {
+  // Must run first
+});
+
+test('use feature', async ({ page }) => {
+  // Assumes user is logged in from previous test
+});
+
+// GOOD: Self-contained tests
+test('login', async ({ page }) => {
+  await login(page);
+  await expect(page).toHaveURL('**/dashboard');
+});
+
+test('use feature', async ({ page }) => {
+  await login(page);  // Login in this test too
+  await useFeature(page);
+});
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="One Context Per Test">
+    Always create a fresh context for each test.
+    
+    ```javascript
+    test('my test', async ({ page }) => {
+      // Fresh context and page
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Clean Up Resources">
+    Always close contexts and browsers.
+    
+    ```javascript
+    const context = await browser.newContext();
+    try {
+      // test code
+    } finally {
+      await context.close();
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Avoid Global State">
+    Don't share state between tests.
+    
+    ```javascript
+    // Bad
+    let shared = {};
+    
+    // Good - local state
+    test('my test', async ({ page }) => {
+      const local = {};
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Make Tests Self-Contained">
+    Each test should set up its own prerequisites.
+    
+    ```javascript
+    test('feature test', async ({ page }) => {
+      await login(page);  // Setup
+      await useFeature(page);  // Test
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing with Playwright Test
+
+Playwright Test provides automatic isolation:
+
+```javascript
+import { test, expect } from '@playwright/test';
+
+test.describe('User features', () => {
+  test('can login', async ({ page }) => {
+    // Fresh page for this test
+    await page.goto('https://example.com');
+  });
+  
+  test('can register', async ({ page }) => {
+    // Fresh page for this test
+    await page.goto('https://example.com');
+  });
+});
+```
+
+Each test gets:
+- Fresh `browser` (or shared based on config)
+- Fresh `context` 
+- Fresh `page`
+- Automatic cleanup
+
+## Isolation Verification
+
+Verify your tests are isolated:
+
+```javascript
+// Run in random order
+// playwright.config.js
+export default {
+  testDir: './tests',
+  fullyParallel: true,
+  workers: 4
+};
+
+// Run multiple times
+// npm test -- --repeat-each=10
+
+// If tests fail randomly, they lack isolation
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Best Practices" icon="star" href="../guides/best-practices">
+    Testing best practices
+  </Card>
+  <Card title="Parallelization" icon="rocket" href="../guides/parallelization">
+    Running tests in parallel
+  </Card>
+  <Card title="Test Runner" icon="play" href="../api-reference/test-runner">
+    Playwright Test API
+  </Card>
+</CardGroup>

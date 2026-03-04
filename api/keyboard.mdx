@@ -1,0 +1,135 @@
+---
+title: Keyboard
+description: API reference for the Playwright Keyboard class for simulating keyboard input.
+---
+
+The Keyboard class provides methods to simulate keyboard input such as typing text and pressing keys. Access the Keyboard instance through `page.keyboard`.
+
+## Methods
+
+### type
+
+Types text character by character.
+
+```javascript
+await page.keyboard.type('Hello World');
+await page.keyboard.type('text', { delay: 100 });
+```
+
+<ParamField path="text" type="string" required>
+  The text to type
+</ParamField>
+
+<ParamField path="options.delay" type="number">
+  Time to wait between key presses in milliseconds. Defaults to 0.
+</ParamField>
+
+---
+
+### press
+
+Presses a single key or a key combination.
+
+```javascript
+await page.keyboard.press('Enter');
+await page.keyboard.press('Control+A');
+await page.keyboard.press('Shift+ArrowLeft');
+```
+
+<ParamField path="key" type="string" required>
+  The key or key combination to press. See [key values](https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values) for valid values.
+</ParamField>
+
+<ParamField path="options.delay" type="number">
+  Time to wait between keydown and keyup in milliseconds. Defaults to 0.
+</ParamField>
+
+---
+
+### down
+
+Holds down a key.
+
+```javascript
+await page.keyboard.down('Shift');
+await page.keyboard.press('A');
+await page.keyboard.up('Shift');
+```
+
+<ParamField path="key" type="string" required>
+  The key to hold down. See [key values](https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values) for valid values.
+</ParamField>
+
+---
+
+### up
+
+Releases a key.
+
+```javascript
+await page.keyboard.down('Shift');
+await page.keyboard.press('A');
+await page.keyboard.up('Shift');
+```
+
+<ParamField path="key" type="string" required>
+  The key to release. See [key values](https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values) for valid values.
+</ParamField>
+
+---
+
+### insertText
+
+Inserts text without simulating key presses.
+
+```javascript
+await page.keyboard.insertText('Hello World');
+```
+
+<ParamField path="text" type="string" required>
+  The text to insert
+</ParamField>
+
+<Note>
+  This method dispatches an `input` event directly, which is much faster than `type()` but does not trigger `keydown`, `keypress`, or `keyup` events.
+</Note>
+
+## Example Usage
+
+### Type Text with Delay
+
+```javascript
+await page.keyboard.type('Hello World', { delay: 100 });
+```
+
+### Keyboard Shortcuts
+
+```javascript
+// Select all text
+await page.keyboard.press('Control+A');
+
+// Copy text
+await page.keyboard.press('Control+C');
+
+// Paste text
+await page.keyboard.press('Control+V');
+```
+
+### Hold Modifier Keys
+
+```javascript
+await page.keyboard.down('Shift');
+await page.keyboard.press('KeyA');
+await page.keyboard.press('KeyB');
+await page.keyboard.press('KeyC');
+await page.keyboard.up('Shift');
+```
+
+### Press Special Keys
+
+```javascript
+await page.keyboard.press('Enter');
+await page.keyboard.press('Tab');
+await page.keyboard.press('Escape');
+await page.keyboard.press('ArrowDown');
+```

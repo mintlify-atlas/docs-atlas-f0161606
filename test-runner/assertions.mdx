@@ -1,0 +1,552 @@
+---
+title: 'Assertions'
+description: 'Comprehensive guide to Playwright Test assertions for web elements, pages, and API responses'
+---
+
+## Introduction
+
+Playwright Test includes assertion methods optimized for the web with automatic retrying and detailed error messages.
+
+## Basic Assertions
+
+From `src/matchers/expect.ts:206-243`:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('basic assertions', async ({ page }) => {
+  // Generic assertions
+  expect(1 + 1).toBe(2);
+  expect('hello').toContain('ell');
+  expect([1, 2, 3]).toHaveLength(3);
+  expect({ name: 'John' }).toEqual({ name: 'John' });
+});
+```
+
+## Web-First Assertions
+
+Playwright provides auto-retrying assertions for web elements from `src/matchers/matchers.ts`:
+
+### Visibility Assertions
+
+<ParamField path="toBeVisible" type="async">
+  Assert element is visible
+
+  From `src/matchers/matchers.ts:160-171`:
+  ```typescript
+  await expect(page.locator('button')).toBeVisible();
+  await expect(page.locator('button')).toBeVisible({ timeout: 5000 });
+  
+  // Negated
+  await expect(page.locator('.loading')).not.toBeVisible();
+  
+  // With visible option
+  await expect(page.locator('button')).toBeVisible({ visible: true });
+  await expect(page.locator('.hidden')).toBeVisible({ visible: false });
+  ```
+</ParamField>
+
+<ParamField path="toBeHidden" type="async">
+  Assert element is hidden
+
+  From `src/matchers/matchers.ts:150-158`:
+  ```typescript
+  await expect(page.locator('.modal')).toBeHidden();
+  ```
+</ParamField>
+
+### Attachment State
+
+<ParamField path="toBeAttached" type="async">
+  Assert element is attached to DOM
+
+  From `src/matchers/matchers.ts:56-67`:
+  ```typescript
+  await expect(page.locator('#element')).toBeAttached();
+  await expect(page.locator('#removed')).toBeAttached({ attached: false });
+  ```
+</ParamField>
+
+### Element State Assertions
+
+<ParamField path="toBeEnabled" type="async">
+  Assert element is enabled
+
+  From `src/matchers/matchers.ts:127-138`:
+  ```typescript
+  await expect(page.locator('button')).toBeEnabled();
+  await expect(page.locator('button')).toBeEnabled({ enabled: false });
+  ```
+</ParamField>
+
+<ParamField path="toBeDisabled" type="async">
+  Assert element is disabled
+
+  From `src/matchers/matchers.ts:94-102`:
+  ```typescript
+  await expect(page.locator('button:disabled')).toBeDisabled();
+  ```
+</ParamField>
+
+<ParamField path="toBeEditable" type="async">
+  Assert element is editable
+
+  From `src/matchers/matchers.ts:104-115`:
+  ```typescript
+  await expect(page.locator('input')).toBeEditable();
+  await expect(page.locator('input[readonly]')).toBeEditable({ editable: false });
+  ```
+</ParamField>
+
+<ParamField path="toBeEmpty" type="async">
+  Assert element is empty
+
+  From `src/matchers/matchers.ts:117-125`:
+  ```typescript
+  await expect(page.locator('.list')).toBeEmpty();
+  ```
+</ParamField>
+
+<ParamField path="toBeFocused" type="async">
+  Assert element is focused
+
+  From `src/matchers/matchers.ts:140-148`:
+  ```typescript
+  await expect(page.locator('input[name=username]')).toBeFocused();
+  ```
+</ParamField>
+
+<ParamField path="toBeChecked" type="async">
+  Assert checkbox is checked
+
+  From `src/matchers/matchers.ts:69-92`:
+  ```typescript
+  await expect(page.locator('input[type=checkbox]')).toBeChecked();
+  await expect(page.locator('input[type=checkbox]')).toBeChecked({ checked: false });
+  
+  // Check for indeterminate state
+  await expect(page.locator('input[type=checkbox]')).toBeChecked({ indeterminate: true });
+  ```
+</ParamField>
+
+<ParamField path="toBeInViewport" type="async">
+  Assert element is in viewport
+
+  From `src/matchers/matchers.ts:173-181`:
+  ```typescript
+  await expect(page.locator('.hero')).toBeInViewport();
+  
+  // At least 50% visible
+  await expect(page.locator('.banner')).toBeInViewport({ ratio: 0.5 });
+  ```
+</ParamField>
+
+### Text Content Assertions
+
+<ParamField path="toHaveText" type="async">
+  Assert element has exact text
+
+  From `src/matchers/matchers.ts:380-397`:
+  ```typescript
+  // String match
+  await expect(page.locator('.title')).toHaveText('Welcome');
+  
+  // Regex match
+  await expect(page.locator('.title')).toHaveText(/Welcome/);
+  
+  // Array match (for multiple elements)
+  await expect(page.locator('li')).toHaveText([
+    'Item 1',
+    'Item 2',
+    'Item 3',
+  ]);
+  
+  // Options
+  await expect(page.locator('.title')).toHaveText('welcome', { 
+    ignoreCase: true,
+    useInnerText: true,
+  });
+  ```
+</ParamField>
+
+<ParamField path="toContainText" type="async">
+  Assert element contains text substring
+
+  From `src/matchers/matchers.ts:183-200`:
+  ```typescript
+  await expect(page.locator('.description')).toContainText('product');
+  await expect(page.locator('.description')).toContainText(/product/i);
+  
+  // Multiple elements
+  await expect(page.locator('li')).toContainText(['Apple', 'Banana']);
+  ```
+</ParamField>
+
+### Attribute Assertions
+
+<ParamField path="toHaveAttribute" type="async">
+  Assert element has attribute
+
+  From `src/matchers/matchers.ts:238-261`:
+  ```typescript
+  // Check attribute exists
+  await expect(page.locator('button')).toHaveAttribute('disabled');
+  
+  // Check attribute value
+  await expect(page.locator('a')).toHaveAttribute('href', '/about');
+  await expect(page.locator('a')).toHaveAttribute('href', /\/about/);
+  
+  // Case insensitive
+  await expect(page.locator('a')).toHaveAttribute('href', '/ABOUT', { 
+    ignoreCase: true 
+  });
+  ```
+</ParamField>
+
+<ParamField path="toHaveClass" type="async">
+  Assert element has CSS class
+
+  From `src/matchers/matchers.ts:263-280`:
+  ```typescript
+  // Single class
+  await expect(page.locator('button')).toHaveClass('btn-primary');
+  await expect(page.locator('button')).toHaveClass(/btn-/);
+  
+  // Multiple elements
+  await expect(page.locator('.item')).toHaveClass([
+    'item active',
+    'item',
+    'item disabled',
+  ]);
+  ```
+</ParamField>
+
+<ParamField path="toContainClass" type="async">
+  Assert element contains CSS class
+
+  From `src/matchers/matchers.ts:282-303`:
+  ```typescript
+  await expect(page.locator('button')).toContainClass('active');
+  
+  // Multiple elements contain class
+  await expect(page.locator('.item')).toContainClass(['visible', 'enabled']);
+  ```
+</ParamField>
+
+<ParamField path="toHaveId" type="async">
+  Assert element has ID
+
+  From `src/matchers/matchers.ts:342-352`:
+  ```typescript
+  await expect(page.locator('input')).toHaveId('username');
+  await expect(page.locator('input')).toHaveId(/user/);
+  ```
+</ParamField>
+
+<ParamField path="toHaveValue" type="async">
+  Assert input has value
+
+  From `src/matchers/matchers.ts:399-409`:
+  ```typescript
+  await expect(page.locator('input')).toHaveValue('John');
+  await expect(page.locator('input')).toHaveValue(/john/i);
+  ```
+</ParamField>
+
+<ParamField path="toHaveValues" type="async">
+  Assert select has values
+
+  From `src/matchers/matchers.ts:411-421`:
+  ```typescript
+  await expect(page.locator('select')).toHaveValues(['option1', 'option2']);
+  ```
+</ParamField>
+
+### CSS Assertions
+
+<ParamField path="toHaveCSS" type="async">
+  Assert element has CSS property
+
+  From `src/matchers/matchers.ts:316-340`:
+  ```typescript
+  // Single property
+  await expect(page.locator('button')).toHaveCSS('color', 'rgb(255, 0, 0)');
+  await expect(page.locator('button')).toHaveCSS('display', /flex/);
+  
+  // Multiple properties
+  await expect(page.locator('button')).toHaveCSS({
+    'color': 'rgb(255, 0, 0)',
+    'background-color': 'rgb(0, 0, 255)',
+  });
+  ```
+</ParamField>
+
+### JavaScript Property Assertions
+
+<ParamField path="toHaveJSProperty" type="async">
+  Assert element has JavaScript property
+
+  From `src/matchers/matchers.ts:354-364`:
+  ```typescript
+  await expect(page.locator('input')).toHaveJSProperty('value', 'text');
+  await expect(page.locator('input')).toHaveJSProperty('disabled', true);
+  ```
+</ParamField>
+
+### Count Assertion
+
+<ParamField path="toHaveCount" type="async">
+  Assert locator matches count of elements
+
+  From `src/matchers/matchers.ts:305-314`:
+  ```typescript
+  await expect(page.locator('li')).toHaveCount(3);
+  await expect(page.locator('.item')).toHaveCount(0);
+  ```
+</ParamField>
+
+### Accessibility Assertions
+
+<ParamField path="toHaveAccessibleName" type="async">
+  Assert element has accessible name
+
+  From `src/matchers/matchers.ts:214-224`:
+  ```typescript
+  await expect(page.locator('button')).toHaveAccessibleName('Submit');
+  await expect(page.locator('button')).toHaveAccessibleName(/submit/i);
+  ```
+</ParamField>
+
+<ParamField path="toHaveAccessibleDescription" type="async">
+  Assert element has accessible description
+
+  From `src/matchers/matchers.ts:202-212`:
+  ```typescript
+  await expect(page.locator('button')).toHaveAccessibleDescription('Click to submit');
+  ```
+</ParamField>
+
+<ParamField path="toHaveAccessibleErrorMessage" type="async">
+  Assert element has accessible error message
+
+  From `src/matchers/matchers.ts:226-236`:
+  ```typescript
+  await expect(page.locator('input')).toHaveAccessibleErrorMessage('Invalid email');
+  ```
+</ParamField>
+
+<ParamField path="toHaveRole" type="async">
+  Assert element has ARIA role
+
+  From `src/matchers/matchers.ts:366-378`:
+  ```typescript
+  await expect(page.locator('button')).toHaveRole('button');
+  await expect(page.locator('nav')).toHaveRole('navigation');
+  ```
+</ParamField>
+
+## Page Assertions
+
+<ParamField path="toHaveTitle" type="async">
+  Assert page has title
+
+  From `src/matchers/matchers.ts:423-433`:
+  ```typescript
+  await expect(page).toHaveTitle('Welcome');
+  await expect(page).toHaveTitle(/Welcome/);
+  ```
+</ParamField>
+
+<ParamField path="toHaveURL" type="async">
+  Assert page has URL
+
+  From `src/matchers/matchers.ts:435-454`:
+  ```typescript
+  await expect(page).toHaveURL('https://example.com/about');
+  await expect(page).toHaveURL(/about/);
+  
+  // Case insensitive
+  await expect(page).toHaveURL('https://example.com/About', { 
+    ignoreCase: true 
+  });
+  ```
+</ParamField>
+
+## API Response Assertions
+
+<ParamField path="toBeOK" type="async">
+  Assert API response is successful (status 200-299)
+
+  From `src/matchers/matchers.ts:456-481`:
+  ```typescript
+  const response = await page.request.get('https://api.example.com/data');
+  await expect(response).toBeOK();
+  ```
+</ParamField>
+
+## Snapshot Assertions
+
+<ParamField path="toHaveScreenshot" type="async">
+  Assert screenshot matches baseline
+
+  ```typescript
+  await expect(page).toHaveScreenshot();
+  await expect(page).toHaveScreenshot('homepage.png');
+  await expect(page).toHaveScreenshot({
+    maxDiffPixels: 100,
+    threshold: 0.2,
+  });
+  ```
+</ParamField>
+
+<ParamField path="toMatchSnapshot" type="sync">
+  Assert value matches snapshot
+
+  ```typescript
+  expect(data).toMatchSnapshot('user-data.json');
+  ```
+</ParamField>
+
+## Polling Assertions
+
+From `src/matchers/expect.ts:127-131,367-403`:
+
+<ParamField path="expect.poll" type="async">
+  Poll until condition is met
+
+  ```typescript
+  await expect.poll(async () => {
+    const response = await page.request.get('/api/status');
+    return response.status();
+  }).toBe(200);
+  
+  // With timeout and intervals
+  await expect.poll(async () => {
+    return await page.locator('.count').textContent();
+  }, {
+    timeout: 10000,
+    intervals: [100, 250, 500],
+  }).toBe('5');
+  ```
+</ParamField>
+
+<ParamField path="toPass" type="async">
+  Retry assertion until it passes
+
+  From `src/matchers/matchers.ts:483-517`:
+  ```typescript
+  await expect(async () => {
+    const response = await page.request.get('/api/status');
+    expect(response.status()).toBe(200);
+  }).toPass({
+    timeout: 10000,
+    intervals: [100, 500, 1000],
+  });
+  ```
+</ParamField>
+
+## Soft Assertions
+
+From `src/matchers/expect.ts:117-121`:
+
+```typescript
+test('soft assertions', async ({ page }) => {
+  // Test continues even if these fail
+  await expect.soft(page.locator('.title')).toHaveText('Welcome');
+  await expect.soft(page.locator('.subtitle')).toBeVisible();
+  
+  // All failures reported at the end
+});
+```
+
+## Custom Assertions
+
+From `src/matchers/expect.ts:101-114`:
+
+```typescript
+import { expect as base } from '@playwright/test';
+
+export const expect = base.extend({
+  async toHaveValidEmail(locator: Locator) {
+    const text = await locator.textContent();
+    const isValid = /^[^@]+@[^@]+\.[^@]+$/.test(text || '');
+    
+    return {
+      pass: isValid,
+      message: () => `Expected ${text} to be a valid email`,
+    };
+  },
+});
+
+// Usage
+await expect(page.locator('.email')).toHaveValidEmail();
+```
+
+## Assertion Options
+
+All web-first assertions support timeout:
+
+```typescript
+await expect(page.locator('.loading')).not.toBeVisible({ 
+  timeout: 5000 
+});
+```
+
+From `src/matchers/expect.ts:136-153,181-198`:
+
+```typescript
+// Configure timeout globally
+export default {
+  expect: {
+    timeout: 10000,
+  },
+};
+
+// Configure per test
+test('with custom timeout', async ({ page }) => {
+  await expect.configure({ timeout: 15000 })(page.locator('.slow'))
+    .toBeVisible();
+});
+```
+
+## Negation
+
+All assertions can be negated with `.not`:
+
+```typescript
+await expect(page.locator('.hidden')).not.toBeVisible();
+await expect(page.locator('button')).not.toBeDisabled();
+await expect(page).not.toHaveURL(/admin/);
+```
+
+## Custom Messages
+
+From `src/matchers/expect.ts:86-88,305-309`:
+
+```typescript
+await expect(page.locator('.count'), 'Item count should be 5')
+  .toHaveText('5');
+
+await expect.configure({ 
+  message: 'Custom failure message' 
+})(page.locator('.title')).toBeVisible();
+```
+
+## Best Practices
+
+1. **Use web-first assertions**: They auto-retry and wait for conditions
+2. **Prefer specific assertions**: Use `toHaveText` instead of `toBe`
+3. **Use soft assertions for multiple checks**: Continue test execution
+4. **Set appropriate timeouts**: Based on your application's behavior
+5. **Add custom messages**: For better debugging
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Test Fixtures" icon="puzzle-piece" href="/test-runner/test-fixtures">
+    Learn about test fixtures
+  </Card>
+  <Card title="Test Hooks" icon="hook" href="/test-runner/test-hooks">
+    Set up test environment with hooks
+  </Card>
+</CardGroup>

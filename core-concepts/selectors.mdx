@@ -1,0 +1,517 @@
+---
+title: Selectors
+description: Understanding Playwright's powerful selector engines and strategies for finding elements
+---
+
+## Overview
+
+Playwright uses **selector engines** to find elements in the page. The selector system is highly flexible and supports multiple strategies.
+
+## Built-in Selector Engines
+
+From server/selectors.ts:32-48:
+
+```typescript
+this._builtinEngines = new Set([
+  'css', 'css:light',
+  'xpath', 'xpath:light',
+  '_react', '_vue',
+  'text', 'text:light',
+  'id', 'id:light',
+  'data-testid', 'data-testid:light',
+  'nth', 'visible', 'internal:control',
+  'internal:has', 'internal:has-not',
+  'internal:has-text', 'internal:has-not-text',
+  'role', 'internal:attr', 'internal:label',
+  'aria-ref'
+]);
+```
+
+## CSS Selectors
+
+Standard CSS selectors work out of the box:
+
+```javascript
+// By ID
+await page.click('#submit-button');
+
+// By class
+await page.click('.btn-primary');
+
+// By attribute
+await page.click('[data-test="login"]');
+
+// Combinators
+await page.click('div.container > button.submit');
+
+// Pseudo-classes
+await page.click('button:not(.disabled)');
+```
+
+### CSS:Light
+
+Pierces shadow DOM:
+
+```javascript
+// Regular CSS stops at shadow boundaries
+await page.click('css=custom-element button');
+
+// css:light pierces shadow DOM
+await page.click('css:light=custom-element button');
+```
+
+## Text Selectors
+
+Find elements by their text content:
+
+```javascript
+// Exact text match
+await page.click('text="Sign In"');
+
+// Substring match
+await page.click('text=Sign');
+
+// Case insensitive
+await page.click('text=/sign in/i');
+
+// Text in specific element
+await page.click('button:has-text("Submit")');
+```
+
+<Note>
+Text selectors are normalized: trimmed and whitespace collapsed.
+</Note>
+
+## XPath Selectors
+
+```javascript
+// XPath syntax
+await page.click('xpath=//button[@id="submit"]');
+
+// Shorthand
+await page.click('//button[@id="submit"]');
+
+// XPath:light (pierces shadow DOM)
+await page.click('xpath:light=//button');
+```
+
+## Role Selectors
+
+Find elements by ARIA role (accessibility-first):
+
+```javascript
+// By role
+await page.getByRole('button').click();
+
+// With name
+await page.getByRole('button', { name: 'Sign In' }).click();
+
+// With attributes
+await page.getByRole('textbox', {
+  name: 'Email',
+  checked: true,
+  disabled: false
+}).fill('user@example.com');
+```
+
+From utils/isomorphic/locatorUtils.ts:
+
+```typescript
+export function getByRoleSelector(role: string, options: ByRoleOptions = {}): string {
+  return `internal:role=${role}[name=${JSON.stringify(options.name || '')}]`;
+}
+```
+
+Supported roles:
+- `button`, `checkbox`, `radio`, `textbox`
+- `link`, `heading`, `img`, `list`, `listitem`
+- `table`, `row`, `cell`, `dialog`
+- And all ARIA roles...
+
+## Test ID Selectors
+
+Recommended for test automation:
+
+```javascript
+// Default attribute: data-testid
+await page.getByTestId('submit-button').click();
+
+// Custom attribute
+playwright.selectors.setTestIdAttribute('data-test-id');
+await page.getByTestId('submit-button').click();
+```
+
+HTML:
+```html
+<button data-testid="submit-button">Submit</button>
+```
+
+<Tip>
+Use test IDs for stable, maintainable selectors that don't break when styling changes.
+</Tip>
+
+## Locator Methods
+
+### getByRole
+
+```javascript
+await page.getByRole('button', { name: 'Submit' }).click();
+```
+
+### getByText
+
+```javascript
+await page.getByText('Welcome').click();
+await page.getByText(/welcome/i).click();
+await page.getByText('Welcome', { exact: true }).click();
+```
+
+### getByLabel
+
+```javascript
+await page.getByLabel('Email').fill('user@example.com');
+await page.getByLabel(/e-?mail/i).fill('user@example.com');
+```
+
+### getByPlaceholder
+
+```javascript
+await page.getByPlaceholder('Enter your email').fill('user@example.com');
+```
+
+### getByAltText
+
+```javascript
+await page.getByAltText('Profile picture').click();
+```
+
+### getByTitle
+
+```javascript
+await page.getByTitle('Close').click();
+```
+
+### getByTestId
+
+```javascript
+await page.getByTestId('submit').click();
+```
+
+## Combining Selectors
+
+### Chaining (>>)
+
+```javascript
+// CSS then text
+await page.click('article >> text=Read more');
+
+// Multiple chains
+await page.click('div.modal >> button >> text=OK');
+```
+
+### Filtering with :has()
+
+```javascript
+// Button containing specific text
+await page.click('button:has-text("Submit")');
+
+// Article containing specific element
+await page.click('article:has(h2:text("Breaking News"))');
+```
+
+From client/locator.ts:44-70:
+
+```typescript
+constructor(frame: Frame, selector: string, options?: LocatorOptions) {
+  this._frame = frame;
+  this._selector = selector;
+  
+  if (options?.hasText)
+    this._selector += ` >> internal:has-text=${escapeForTextSelector(options.hasText, false)}`;
+  
+  if (options?.has) {
+    const locator = options.has;
+    if (locator._frame !== frame)
+      throw new Error(`Inner "has" locator must belong to the same frame.`);
+    this._selector += ` >> internal:has=` + JSON.stringify(locator._selector);
+  }
+}
+```
+
+### And Combinator
+
+```javascript
+// Element matching both selectors
+const locator = page.locator('button').and(page.locator('[type="submit"]'));
+await locator.click();
+```
+
+### Or Combinator
+
+```javascript
+// Element matching either selector
+const locator = page.locator('button').or(page.locator('input[type="submit"]'));
+await locator.click();
+```
+
+## React & Vue Selectors
+
+Find elements by React/Vue component names:
+
+```javascript
+// React component
+await page.locator('_react=MyButton').click();
+
+// React component with props
+await page.locator('_react=MyButton[disabled=false]').click();
+
+// Vue component
+await page.locator('_vue=MyButton').click();
+```
+
+<Warning>
+React/Vue selectors require components to be in development mode or have displayName set.
+</Warning>
+
+## Layout Selectors
+
+### Positional
+
+```javascript
+// First matching element
+await page.locator('button').first().click();
+
+// Last matching element
+await page.locator('button').last().click();
+
+// Nth element (0-indexed)
+await page.locator('button').nth(2).click();
+```
+
+### Visibility
+
+```javascript
+// Only visible elements
+const locator = page.locator('button', { visible: true });
+
+// Hidden elements
+const locator = page.locator('button', { visible: false });
+```
+
+### Filtering
+
+```javascript
+// Filter by text
+const locator = page.locator('button', {
+  hasText: 'Submit'
+});
+
+// Filter by child element
+const locator = page.locator('article', {
+  has: page.locator('img')
+});
+
+// Exclude by text
+const locator = page.locator('button', {
+  hasNotText: 'Cancel'
+});
+
+// Exclude by child
+const locator = page.locator('article', {
+  hasNot: page.locator('.ad')
+});
+```
+
+## Strict Mode
+
+By default, actions require exactly one matching element:
+
+```javascript
+// Throws if multiple buttons match
+await page.click('button');
+
+// Disable strict mode (not recommended)
+await page.click('button', { strict: false });
+
+// Better: make selector more specific
+await page.click('button.submit');
+```
+
+<Note>
+Strict mode prevents accidental interactions with the wrong element.
+</Note>
+
+## Selector Examples
+
+### By Attribute
+
+```javascript
+// Single attribute
+await page.click('[data-test="login"]');
+
+// Multiple attributes
+await page.click('[type="submit"][disabled="false"]');
+
+// Attribute contains
+await page.click('[class*="btn"]');
+
+// Attribute starts with
+await page.click('[id^="submit"]');
+```
+
+### By Relationship
+
+```javascript
+// Parent-child
+await page.click('form > button');
+
+// Descendant
+await page.click('form button');
+
+// Adjacent sibling
+await page.click('label + input');
+
+// General sibling
+await page.click('h2 ~ p');
+```
+
+### Complex Selectors
+
+```javascript
+// Multiple conditions
+await page.click('button.primary:not(.disabled):has-text("Submit")');
+
+// Chained selectors
+await page.click('div.modal >> form >> button[type="submit"]');
+
+// With filters
+const locator = page.locator('article', {
+  has: page.locator('h2', { hasText: 'News' })
+});
+await locator.locator('a.read-more').click();
+```
+
+## Custom Selector Engines
+
+Register custom selector engines:
+
+```javascript
+// Register custom engine
+await playwright.selectors.register('tag', {
+  // Query one element
+  query(root, selector) {
+    return root.querySelector(selector);
+  },
+  // Query all elements
+  queryAll(root, selector) {
+    return Array.from(root.querySelectorAll(selector));
+  }
+});
+
+// Use custom engine
+await page.click('tag=button');
+```
+
+## Selector Best Practices
+
+<AccordionGroup>
+  <Accordion title="Prefer User-Facing Attributes">
+    Use roles, labels, and text that users see.
+    
+    ```javascript
+    // Good
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await page.getByLabel('Email').fill('user@example.com');
+    
+    // Avoid
+    await page.click('.btn-submit-xyz-123');
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Test IDs for Stability">
+    Add data-testid for elements without good text or role.
+    
+    ```javascript
+    // Stable selector
+    await page.getByTestId('checkout-button').click();
+    ```
+  </Accordion>
+  
+  <Accordion title="Avoid XPath When Possible">
+    CSS and text selectors are more readable and maintainable.
+    
+    ```javascript
+    // Better
+    await page.click('button:has-text("Submit")');
+    
+    // Avoid
+    await page.click('//button[contains(text(), "Submit")]');
+    ```
+  </Accordion>
+  
+  <Accordion title="Be Specific But Not Brittle">
+    Balance specificity with maintainability.
+    
+    ```javascript
+    // Too brittle
+    await page.click('div.container > div:nth-child(3) > button.btn-primary-xyz');
+    
+    // Better
+    await page.click('button[type="submit"]');
+    
+    // Best
+    await page.getByRole('button', { name: 'Submit' }).click();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Selectors
+
+```javascript
+// Get all matching elements count
+const count = await page.locator('button').count();
+console.log(`Found ${count} buttons`);
+
+// Get element attributes
+const text = await page.locator('button').textContent();
+const isVisible = await page.locator('button').isVisible();
+
+// Highlight element (in headed mode)
+await page.locator('button').highlight();
+
+// Get computed selector
+const selector = await page.locator('button').toString();
+console.log(selector);
+```
+
+## Selector Performance
+
+1. **CSS is fastest** - Browser-native
+2. **Text selectors are slower** - Require content scanning
+3. **XPath is slowest** - Complex evaluation
+4. **Layout selectors** - May require style computation
+
+```javascript
+// Fast
+await page.click('#submit');
+
+// Slower
+await page.click('text=Submit');
+
+// Slowest
+await page.click('//button[contains(text(), "Submit")]');
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Auto-waiting" icon="clock" href="./auto-waiting">
+    How Playwright waits for elements
+  </Card>
+  <Card title="Locators" icon="location-dot" href="../api-reference/locators">
+    Locator API reference
+  </Card>
+  <Card title="Test Isolation" icon="shield" href="./test-isolation">
+    Ensuring independent tests
+  </Card>
+</CardGroup>

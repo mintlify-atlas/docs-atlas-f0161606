@@ -1,0 +1,695 @@
+---
+title: ElementHandle
+description: API reference for the ElementHandle class - direct DOM element references
+---
+
+ElementHandle represents an in-page DOM element. ElementHandles are discouraged in favor of Locators, but they are useful when you need to retain a reference to a specific element.
+
+## Inheritance
+
+Extends: `JSHandle<Node>`
+
+## Constructor
+
+ElementHandles are typically created through page methods like `page.$()` or `frame.$()`.
+
+## Frame Methods
+
+### ownerFrame
+
+Returns the frame containing this element.
+
+```typescript
+ownerFrame(): Promise<Frame | null>
+```
+
+**Returns:** `Promise<Frame | null>` - Owner frame or null
+
+### contentFrame
+
+Returns the content frame for iframe elements.
+
+```typescript
+contentFrame(): Promise<Frame | null>
+```
+
+**Returns:** `Promise<Frame | null>` - Content frame or null
+
+## Action Methods
+
+### click
+
+Clicks the element.
+
+```typescript
+click(options?: ClickOptions): Promise<void>
+```
+
+<ParamField path="options" type="ClickOptions" optional>
+  Click options
+  
+  - `button` ('left' | 'right' | 'middle'): Mouse button
+  - `clickCount` (number): Number of clicks
+  - `delay` (number): Delay between mousedown and mouseup
+  - `position` (object): Click position { x, y }
+  - `modifiers` (string[]): Modifier keys
+  - `force` (boolean): Force click
+  - `noWaitAfter` (boolean): Don't wait after click
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### dblclick
+
+Double clicks the element.
+
+```typescript
+dblclick(options?: DblClickOptions): Promise<void>
+```
+
+### tap
+
+Taps the element.
+
+```typescript
+tap(options?: TapOptions): Promise<void>
+```
+
+### hover
+
+Hovers over the element.
+
+```typescript
+hover(options?: HoverOptions): Promise<void>
+```
+
+<ParamField path="options" type="HoverOptions" optional>
+  Hover options
+  
+  - `position` (object): Hover position { x, y }
+  - `modifiers` (string[]): Modifier keys
+  - `force` (boolean): Force hover
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### fill
+
+Fills an input element.
+
+```typescript
+fill(value: string, options?: FillOptions): Promise<void>
+```
+
+<ParamField path="value" type="string" required>
+  Value to fill
+</ParamField>
+
+<ParamField path="options" type="FillOptions" optional>
+  Fill options
+  
+  - `force` (boolean): Force fill
+  - `noWaitAfter` (boolean): Don't wait after fill
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### type
+
+Types text into the element.
+
+```typescript
+type(text: string, options?: TypeOptions): Promise<void>
+```
+
+<ParamField path="text" type="string" required>
+  Text to type
+</ParamField>
+
+<ParamField path="options" type="TypeOptions" optional>
+  Type options
+  
+  - `delay` (number): Delay between key presses in milliseconds
+  - `noWaitAfter` (boolean): Don't wait after typing
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### press
+
+Presses a key.
+
+```typescript
+press(key: string, options?: PressOptions): Promise<void>
+```
+
+<ParamField path="key" type="string" required>
+  Key to press (e.g., 'Enter', 'ArrowDown', 'Control+A')
+</ParamField>
+
+<ParamField path="options" type="PressOptions" optional>
+  Press options
+  
+  - `delay` (number): Delay between keydown and keyup
+  - `noWaitAfter` (boolean): Don't wait after press
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### check
+
+Checks a checkbox or radio button.
+
+```typescript
+check(options?: CheckOptions): Promise<void>
+```
+
+<ParamField path="options" type="CheckOptions" optional>
+  Check options
+  
+  - `force` (boolean): Force check
+  - `noWaitAfter` (boolean): Don't wait after check
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### uncheck
+
+Unchecks a checkbox.
+
+```typescript
+uncheck(options?: CheckOptions): Promise<void>
+```
+
+### setChecked
+
+Sets checkbox state.
+
+```typescript
+setChecked(checked: boolean, options?: CheckOptions): Promise<void>
+```
+
+<ParamField path="checked" type="boolean" required>
+  Whether to check or uncheck
+</ParamField>
+
+<ParamField path="options" type="CheckOptions" optional>
+  Check options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### selectOption
+
+Selects options in a `<select>` element.
+
+```typescript
+selectOption(values: string | string[] | ElementHandle | ElementHandle[] | SelectOption | SelectOption[], options?: SelectOptionOptions): Promise<string[]>
+```
+
+<ParamField path="values" type="string | string[] | ElementHandle | ElementHandle[] | SelectOption | SelectOption[]" required>
+  Values to select
+</ParamField>
+
+<ParamField path="options" type="SelectOptionOptions" optional>
+  Select options
+  
+  - `force` (boolean): Force select
+  - `noWaitAfter` (boolean): Don't wait after select
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<string[]>` - Array of selected option values
+
+### focus
+
+Focuses the element.
+
+```typescript
+focus(): Promise<void>
+```
+
+**Returns:** `Promise<void>`
+
+### setInputFiles
+
+Sets files for a file input element.
+
+```typescript
+setInputFiles(files: string | string[] | FilePayload | FilePayload[], options?: SetInputFilesOptions): Promise<void>
+```
+
+<ParamField path="files" type="string | string[] | FilePayload | FilePayload[]" required>
+  File paths or file payloads to upload
+</ParamField>
+
+<ParamField path="options" type="SetInputFilesOptions" optional>
+  Upload options
+  
+  - `noWaitAfter` (boolean): Don't wait after setting files
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### dispatchEvent
+
+Dispatches a DOM event.
+
+```typescript
+dispatchEvent(type: string, eventInit?: any): Promise<void>
+```
+
+<ParamField path="type" type="string" required>
+  Event type (e.g., 'click', 'submit')
+</ParamField>
+
+<ParamField path="eventInit" type="any" optional>
+  Event initialization object
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+## Content Methods
+
+### textContent
+
+Returns element's text content.
+
+```typescript
+textContent(): Promise<string | null>
+```
+
+**Returns:** `Promise<string | null>` - Text content or null
+
+### innerText
+
+Returns element's inner text.
+
+```typescript
+innerText(): Promise<string>
+```
+
+**Returns:** `Promise<string>` - Inner text
+
+### innerHTML
+
+Returns element's inner HTML.
+
+```typescript
+innerHTML(): Promise<string>
+```
+
+**Returns:** `Promise<string>` - Inner HTML
+
+### getAttribute
+
+Returns attribute value.
+
+```typescript
+getAttribute(name: string): Promise<string | null>
+```
+
+<ParamField path="name" type="string" required>
+  Attribute name
+</ParamField>
+
+**Returns:** `Promise<string | null>` - Attribute value or null
+
+### inputValue
+
+Returns input value.
+
+```typescript
+inputValue(): Promise<string>
+```
+
+**Returns:** `Promise<string>` - Input value
+
+## State Methods
+
+### isVisible
+
+Checks if element is visible.
+
+```typescript
+isVisible(): Promise<boolean>
+```
+
+**Returns:** `Promise<boolean>` - True if visible
+
+### isHidden
+
+Checks if element is hidden.
+
+```typescript
+isHidden(): Promise<boolean>
+```
+
+**Returns:** `Promise<boolean>` - True if hidden
+
+### isEnabled
+
+Checks if element is enabled.
+
+```typescript
+isEnabled(): Promise<boolean>
+```
+
+**Returns:** `Promise<boolean>` - True if enabled
+
+### isDisabled
+
+Checks if element is disabled.
+
+```typescript
+isDisabled(): Promise<boolean>
+```
+
+**Returns:** `Promise<boolean>` - True if disabled
+
+### isChecked
+
+Checks if checkbox or radio is checked.
+
+```typescript
+isChecked(): Promise<boolean>
+```
+
+**Returns:** `Promise<boolean>` - True if checked
+
+### isEditable
+
+Checks if element is editable.
+
+```typescript
+isEditable(): Promise<boolean>
+```
+
+**Returns:** `Promise<boolean>` - True if editable
+
+## Selector Methods
+
+### $
+
+Finds a descendant element.
+
+```typescript
+$(selector: string): Promise<ElementHandle | null>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to query
+</ParamField>
+
+**Returns:** `Promise<ElementHandle | null>` - Element handle or null
+
+### $$
+
+Finds all descendant elements.
+
+```typescript
+$$(selector: string): Promise<ElementHandle[]>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to query
+</ParamField>
+
+**Returns:** `Promise<ElementHandle[]>` - Array of element handles
+
+### $eval
+
+Evaluates function on a descendant element.
+
+```typescript
+$eval<R, Arg>(selector: string, pageFunction: Function, arg?: Arg): Promise<R>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to query
+</ParamField>
+
+<ParamField path="pageFunction" type="Function" required>
+  Function to evaluate
+</ParamField>
+
+<ParamField path="arg" type="any" optional>
+  Argument to pass to function
+</ParamField>
+
+**Returns:** `Promise<R>` - Evaluation result
+
+### $$eval
+
+Evaluates function on all descendant elements.
+
+```typescript
+$$eval<R, Arg>(selector: string, pageFunction: Function, arg?: Arg): Promise<R>
+```
+
+### waitForSelector
+
+Waits for a descendant element.
+
+```typescript
+waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<ElementHandle | null>
+```
+
+<ParamField path="selector" type="string" required>
+  Selector to wait for
+</ParamField>
+
+<ParamField path="options" type="WaitForSelectorOptions" optional>
+  Wait options
+  
+  - `state` ('attached' | 'visible' | 'hidden' | 'detached'): Element state
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<ElementHandle | null>` - Element handle or null
+
+## Utility Methods
+
+### boundingBox
+
+Returns element's bounding box.
+
+```typescript
+boundingBox(): Promise<Rect | null>
+```
+
+**Returns:** `Promise<Rect | null>` - Bounding box { x, y, width, height } or null
+
+### screenshot
+
+Takes a screenshot of the element.
+
+```typescript
+screenshot(options?: ScreenshotOptions): Promise<Buffer>
+```
+
+<ParamField path="options" type="ScreenshotOptions" optional>
+  Screenshot options
+  
+  - `path` (string): File path to save to
+  - `type` ('png' | 'jpeg'): Image type
+  - `quality` (number): JPEG quality (0-100)
+  - `omitBackground` (boolean): Transparent background
+  - `timeout` (number): Maximum time
+  - `mask` (Locator[]): Elements to mask
+</ParamField>
+
+**Returns:** `Promise<Buffer>` - Screenshot buffer
+
+### scrollIntoViewIfNeeded
+
+Scrolls element into view if needed.
+
+```typescript
+scrollIntoViewIfNeeded(options?: ScrollOptions): Promise<void>
+```
+
+<ParamField path="options" type="ScrollOptions" optional>
+  Scroll options
+  
+  - `timeout` (number): Maximum time
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### selectText
+
+Selects text in the element.
+
+```typescript
+selectText(options?: TimeoutOptions): Promise<void>
+```
+
+<ParamField path="options" type="TimeoutOptions" optional>
+  Timeout options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### waitForElementState
+
+Waits for element to reach a specific state.
+
+```typescript
+waitForElementState(state: 'visible' | 'hidden' | 'stable' | 'enabled' | 'disabled', options?: TimeoutOptions): Promise<void>
+```
+
+<ParamField path="state" type="string" required>
+  State to wait for
+  
+  - `visible`: Element is visible
+  - `hidden`: Element is hidden
+  - `stable`: Element is stable (not animating)
+  - `enabled`: Element is enabled
+  - `disabled`: Element is disabled
+</ParamField>
+
+<ParamField path="options" type="TimeoutOptions" optional>
+  Timeout options
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+## Usage Examples
+
+### Basic ElementHandle Usage
+
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('https://example.com');
+
+const button = await page.$('button#submit');
+if (button) {
+  await button.click();
+  await button.dispose();
+}
+
+await browser.close();
+```
+
+### Querying Descendants
+
+```typescript
+const form = await page.$('form');
+if (form) {
+  const inputs = await form.$$('input');
+  console.log(`Found ${inputs.length} inputs`);
+  
+  const submitButton = await form.$('button[type="submit"]');
+  await submitButton?.click();
+}
+```
+
+### Getting Element Properties
+
+```typescript
+const element = await page.$('.info');
+if (element) {
+  const text = await element.textContent();
+  const html = await element.innerHTML();
+  const id = await element.getAttribute('id');
+  const isVisible = await element.isVisible();
+  
+  console.log({ text, html, id, isVisible });
+}
+```
+
+### Form Interactions
+
+```typescript
+const nameInput = await page.$('#name');
+await nameInput?.fill('John Doe');
+
+const emailInput = await page.$('#email');
+await emailInput?.type('john@example.com', { delay: 100 });
+
+const checkbox = await page.$('#terms');
+await checkbox?.check();
+
+const select = await page.$('select#country');
+await select?.selectOption('US');
+```
+
+### Taking Element Screenshots
+
+```typescript
+const element = await page.$('.chart');
+if (element) {
+  await element.screenshot({
+    path: 'chart.png',
+    type: 'png',
+  });
+  
+  const box = await element.boundingBox();
+  console.log('Element position:', box);
+}
+```
+
+### Working with Frames
+
+```typescript
+const iframeElement = await page.$('iframe');
+if (iframeElement) {
+  const frame = await iframeElement.contentFrame();
+  if (frame) {
+    await frame.fill('#username', 'user');
+    await frame.click('button');
+  }
+}
+```
+
+### Waiting for Element State
+
+```typescript
+const button = await page.$('button');
+if (button) {
+  await button.waitForElementState('visible');
+  await button.waitForElementState('enabled');
+  await button.click();
+}
+```
+
+## Important Notes
+
+1. **Memory Management**: Always dispose of ElementHandles when done to prevent memory leaks:
+   ```typescript
+   const element = await page.$('button');
+   await element?.click();
+   await element?.dispose();
+   ```
+
+2. **Prefer Locators**: Locators are recommended over ElementHandles for most use cases:
+   ```typescript
+   // Prefer this:
+   await page.locator('button').click();
+   
+   // Over this:
+   const button = await page.$('button');
+   await button?.click();
+   ```
+
+3. **Stale References**: ElementHandles can become stale if the DOM changes. Locators automatically re-query.
+
+4. **Auto-Waiting**: Unlike Locators, ElementHandles don't automatically wait for actionability. Use `waitForElementState()` when needed.
+
+## Related Classes
+
+- [Locator](/api/locator) - Modern element selection (recommended)
+- [Page](/api/page) - Page methods for querying elements
+- [Frame](/api/frame) - Frame methods for querying elements
+- [JSHandle](/api/jshandle) - Base class for JavaScript object handles

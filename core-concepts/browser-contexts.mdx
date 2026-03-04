@@ -1,0 +1,514 @@
+---
+title: Browser Contexts
+description: Understanding isolated browser sessions, their lifecycle, and use cases
+---
+
+## What is a Browser Context?
+
+A **BrowserContext** (client/browserContext.ts:58) is an isolated, incognito-like browser session within a browser instance. Each context has:
+
+- Independent cookies
+- Separate localStorage and sessionStorage
+- Isolated cache
+- Independent permissions and geolocation
+- Separate network state
+
+<Note>
+Think of contexts as separate browser profiles running in the same browser process.
+</Note>
+
+## Creating Contexts
+
+### Basic Context Creation
+
+```javascript
+const browser = await chromium.launch();
+const context = await browser.newContext();
+
+// Use the context
+const page = await context.newPage();
+await page.goto('https://example.com');
+
+// Clean up
+await context.close();
+await browser.close();
+```
+
+### Context with Options
+
+```javascript
+const context = await browser.newContext({
+  viewport: { width: 1920, height: 1080 },
+  userAgent: 'Custom User Agent',
+  locale: 'en-US',
+  timezoneId: 'America/New_York',
+  permissions: ['geolocation'],
+  geolocation: { latitude: 37.7749, longitude: -122.4194 },
+  colorScheme: 'dark',
+  hasTouch: true
+});
+```
+
+## BrowserContext Class
+
+From client/browserContext.ts:58-174:
+
+```typescript
+export class BrowserContext extends ChannelOwner<channels.BrowserContextChannel> {
+  _pages = new Set<Page>();
+  _routes: network.RouteHandler[] = [];
+  readonly _bindings = new Map<string, Function>();
+  _timeoutSettings: TimeoutSettings;
+  readonly request: APIRequestContext;
+  readonly tracing: Tracing;
+  readonly clock: Clock;
+  
+  async newPage(): Promise<Page> {
+    return Page.from((await this._channel.newPage()).page);
+  }
+  
+  pages(): Page[] {
+    return [...this._pages];
+  }
+  
+  async close(options: { reason?: string } = {}): Promise<void> {
+    // Closes all pages and the context
+  }
+}
+```
+
+## Context Lifecycle
+
+<Steps>
+  <Step title="Create Context">
+    ```javascript
+    const context = await browser.newContext(options);
+    ```
+  </Step>
+  
+  <Step title="Create Pages">
+    ```javascript
+    const page1 = await context.newPage();
+    const page2 = await context.newPage();
+    ```
+  </Step>
+  
+  <Step title="Configure Context">
+    ```javascript
+    await context.addCookies([/* cookies */]);
+    await context.grantPermissions(['geolocation']);
+    await context.route('**/*', route => route.continue());
+    ```
+  </Step>
+  
+  <Step title="Use Pages">
+    All pages share the context's state
+  </Step>
+  
+  <Step title="Close Context">
+    ```javascript
+    await context.close();
+    ```
+    All pages in the context are closed
+  </Step>
+</Steps>
+
+## Context Isolation
+
+Contexts are completely isolated from each other:
+
+```javascript
+const browser = await chromium.launch();
+
+// Context 1: Logged in as User A
+const context1 = await browser.newContext();
+const page1 = await context1.newPage();
+await page1.goto('https://example.com/login');
+await page1.fill('#username', 'userA');
+await page1.click('#login');
+
+// Context 2: Logged in as User B (independent session)
+const context2 = await browser.newContext();
+const page2 = await context2.newPage();
+await page2.goto('https://example.com/login');
+await page2.fill('#username', 'userB');
+await page2.click('#login');
+
+// Both sessions run independently
+```
+
+## Cookies Management
+
+### Getting Cookies
+
+```javascript
+// Get all cookies
+const cookies = await context.cookies();
+
+// Get cookies for specific URL
+const cookies = await context.cookies('https://example.com');
+
+// Get cookies for multiple URLs
+const cookies = await context.cookies([
+  'https://example.com',
+  'https://another.com'
+]);
+```
+
+From client/browserContext.ts:301:
+
+```typescript
+async cookies(urls?: string | string[]): Promise<network.NetworkCookie[]> {
+  if (!urls)
+    urls = [];
+  if (urls && typeof urls === 'string')
+    urls = [urls];
+  return (await this._channel.cookies({ urls: urls as string[] })).cookies;
+}
+```
+
+### Adding Cookies
+
+```javascript
+await context.addCookies([
+  {
+    name: 'session',
+    value: 'abc123',
+    domain: 'example.com',
+    path: '/',
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax'
+  }
+]);
+```
+
+### Clearing Cookies
+
+```javascript
+// Clear all cookies
+await context.clearCookies();
+
+// Clear specific cookie
+await context.clearCookies({ name: 'session' });
+
+// Clear by domain
+await context.clearCookies({ domain: 'example.com' });
+
+// Clear with regex
+await context.clearCookies({ name: /^session_.*/ });
+```
+
+## Storage State
+
+### Saving State
+
+Save cookies and localStorage for later reuse:
+
+```javascript
+const context = await browser.newContext();
+const page = await context.newPage();
+
+// Login
+await page.goto('https://example.com/login');
+await page.fill('#username', 'user');
+await page.fill('#password', 'pass');
+await page.click('#login');
+
+// Save authenticated state
+await context.storageState({ path: 'auth.json' });
+await context.close();
+```
+
+### Loading State
+
+Restore saved state in a new context:
+
+```javascript
+const context = await browser.newContext({
+  storageState: 'auth.json'
+});
+
+// Already logged in!
+const page = await context.newPage();
+await page.goto('https://example.com/dashboard');
+```
+
+From client/browserContext.ts:465:
+
+```typescript
+async storageState(options: { path?: string } = {}): Promise<StorageState> {
+  const state = await this._channel.storageState();
+  if (options.path) {
+    await mkdirIfNeeded(this._platform, options.path);
+    await this._platform.fs().promises.writeFile(options.path, JSON.stringify(state, undefined, 2), 'utf8');
+  }
+  return state;
+}
+```
+
+## Permissions
+
+### Granting Permissions
+
+```javascript
+await context.grantPermissions(['geolocation', 'notifications']);
+
+// Grant for specific origin
+await context.grantPermissions(['clipboard-read'], {
+  origin: 'https://example.com'
+});
+```
+
+### Clearing Permissions
+
+```javascript
+await context.clearPermissions();
+```
+
+Available permissions:
+- `geolocation`
+- `notifications`
+- `camera`
+- `microphone`
+- `clipboard-read`
+- `clipboard-write`
+
+## Network Control
+
+### HTTP Credentials
+
+```javascript
+const context = await browser.newContext({
+  httpCredentials: {
+    username: 'user',
+    password: 'pass'
+  }
+});
+```
+
+### Extra HTTP Headers
+
+```javascript
+await context.setExtraHTTPHeaders({
+  'X-Custom-Header': 'value',
+  'Authorization': 'Bearer token'
+});
+```
+
+### Offline Mode
+
+```javascript
+await context.setOffline(true);
+
+// Test offline behavior
+await page.goto('https://example.com'); // Will fail
+
+await context.setOffline(false);
+```
+
+## Route Handlers
+
+Intercept and modify network requests at the context level:
+
+```javascript
+// All pages in this context will have this route
+await context.route('**/*.png', route => {
+  route.abort();
+});
+
+// Modify API responses
+await context.route('**/api/**', route => {
+  if (route.request().method() === 'GET') {
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({ mocked: true })
+    });
+  } else {
+    route.continue();
+  }
+});
+```
+
+From client/browserContext.ts:368-371:
+
+```typescript
+async route(url: URLMatch, handler: network.RouteHandlerCallback, options: { times?: number } = {}): Promise<void> {
+  this._routes.unshift(new network.RouteHandler(this._platform, this._options.baseURL, url, handler, options.times));
+  await this._updateInterceptionPatterns({ title: 'Route requests' });
+}
+```
+
+## Events
+
+```javascript
+// New page created
+context.on('page', page => {
+  console.log('New page:', page.url());
+});
+
+// Request made
+context.on('request', request => {
+  console.log('Request:', request.url());
+});
+
+// Response received
+context.on('response', response => {
+  console.log('Response:', response.url(), response.status());
+});
+
+// Console message from any page
+context.on('console', msg => {
+  console.log('Console:', msg.text());
+});
+
+// Context closed
+context.on('close', () => {
+  console.log('Context closed');
+});
+```
+
+## Tracing
+
+Record traces for debugging:
+
+```javascript
+const context = await browser.newContext();
+
+// Start tracing
+await context.tracing.start({
+  screenshots: true,
+  snapshots: true
+});
+
+// Perform actions
+const page = await context.newPage();
+await page.goto('https://example.com');
+
+// Stop and save trace
+await context.tracing.stop({
+  path: 'trace.zip'
+});
+```
+
+## API Request Context
+
+Each context has an API request context for HTTP requests:
+
+```javascript
+// Make API calls with context's cookies and headers
+const response = await context.request.get('https://api.example.com/user');
+const data = await response.json();
+
+// POST request
+await context.request.post('https://api.example.com/data', {
+  data: { key: 'value' }
+});
+```
+
+From client/browserContext.ts:97:
+
+```typescript
+this.request = APIRequestContext.from(initializer.requestContext);
+this.request._timeoutSettings = this._timeoutSettings;
+```
+
+## Emulation
+
+### Viewport
+
+```javascript
+const context = await browser.newContext({
+  viewport: { width: 1920, height: 1080 }
+});
+
+// Or null for no viewport
+const context = await browser.newContext({
+  viewport: null
+});
+```
+
+### User Agent
+
+```javascript
+const context = await browser.newContext({
+  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) ...'
+});
+```
+
+### Locale and Timezone
+
+```javascript
+const context = await browser.newContext({
+  locale: 'de-DE',
+  timezoneId: 'Europe/Berlin'
+});
+```
+
+### Color Scheme
+
+```javascript
+const context = await browser.newContext({
+  colorScheme: 'dark' // or 'light', 'no-preference'
+});
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="One Context Per Test">
+    Create a fresh context for each test to ensure isolation.
+    
+    ```javascript
+    test('my test', async ({ browser }) => {
+      const context = await browser.newContext();
+      // ... test ...
+      await context.close();
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Reuse Browser, Not Contexts">
+    Contexts are lightweight but should be recreated for test isolation.
+    
+    ```javascript
+    // One browser for all tests
+    const browser = await chromium.launch();
+    
+    // New context per test
+    for (const test of tests) {
+      const context = await browser.newContext();
+      await runTest(test, context);
+      await context.close();
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Save Storage State for Auth">
+    Authenticate once, save state, reuse across tests.
+    
+    ```javascript
+    // Setup: authenticate and save
+    await context.storageState({ path: 'auth.json' });
+    
+    // Tests: load authenticated state
+    const context = await browser.newContext({
+      storageState: 'auth.json'
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pages and Frames" icon="file" href="./pages-and-frames">
+    Working with pages within contexts
+  </Card>
+  <Card title="Test Isolation" icon="shield" href="./test-isolation">
+    Ensuring test independence
+  </Card>
+  <Card title="Selectors" icon="crosshairs" href="./selectors">
+    Finding elements on pages
+  </Card>
+</CardGroup>

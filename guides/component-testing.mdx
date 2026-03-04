@@ -1,0 +1,387 @@
+---
+title: 'Component Testing'
+description: 'Test React, Vue, and other framework components in isolation with Playwright Component Testing'
+---
+
+## Overview
+
+Playwright Component Testing allows you to test UI components in isolation within a real browser environment. Test React, Vue, Svelte, and other framework components with the same Playwright APIs you use for end-to-end testing.
+
+## Getting Started
+
+### Installation
+
+Install Playwright Component Testing for your framework:
+
+<CodeGroup>
+```bash React
+npm init playwright@latest -- --ct
+```
+
+```bash Vue
+npm init playwright@latest -- --ct
+```
+
+```bash Svelte
+npm init playwright@latest -- --ct
+```
+</CodeGroup>
+
+This creates a `playwright-ct.config.ts` file and installs the necessary dependencies.
+
+### Project Structure
+
+```
+my-app/
+├── src/
+│   ├── components/
+│   │   ├── Button.tsx
+│   │   └── Button.test.tsx
+│   └── ...
+├── playwright-ct.config.ts
+└── package.json
+```
+
+## React Component Testing
+
+### Basic Component Test
+
+```typescript
+import { test, expect } from '@playwright/experimental-ct-react';
+import Button from './Button';
+
+test('button click', async ({ mount }) => {
+  let clicked = false;
+  
+  const component = await mount(
+    <Button onClick={() => { clicked = true; }}>Click me</Button>
+  );
+  
+  await component.click();
+  expect(clicked).toBe(true);
+});
+```
+
+### Test Component Props
+
+```typescript
+import { test, expect } from '@playwright/experimental-ct-react';
+import UserCard from './UserCard';
+
+test('display user information', async ({ mount }) => {
+  const component = await mount(
+    <UserCard 
+      name="John Doe"
+      email="john@example.com"
+      role="Admin"
+    />
+  );
+  
+  await expect(component.getByText('John Doe')).toBeVisible();
+  await expect(component.getByText('john@example.com')).toBeVisible();
+  await expect(component.getByText('Admin')).toBeVisible();
+});
+```
+
+### Test Component State
+
+```typescript
+import { test, expect } from '@playwright/experimental-ct-react';
+import Counter from './Counter';
+
+test('counter increments', async ({ mount }) => {
+  const component = await mount(<Counter initialValue={0} />);
+  
+  await expect(component.getByText('Count: 0')).toBeVisible();
+  
+  await component.getByRole('button', { name: 'Increment' }).click();
+  await expect(component.getByText('Count: 1')).toBeVisible();
+  
+  await component.getByRole('button', { name: 'Increment' }).click();
+  await expect(component.getByText('Count: 2')).toBeVisible();
+});
+```
+
+## Vue Component Testing
+
+### Basic Vue Component Test
+
+```typescript
+import { test, expect } from '@playwright/experimental-ct-vue';
+import TodoItem from './TodoItem.vue';
+
+test('todo item', async ({ mount }) => {
+  const component = await mount(TodoItem, {
+    props: {
+      text: 'Buy groceries',
+      completed: false,
+    },
+  });
+  
+  await expect(component.getByText('Buy groceries')).toBeVisible();
+  await expect(component.locator('.completed')).not.toBeVisible();
+  
+  // Mark as completed
+  await component.getByRole('checkbox').check();
+  await expect(component.locator('.completed')).toBeVisible();
+});
+```
+
+### Test Vue Events
+
+```typescript
+import { test, expect } from '@playwright/experimental-ct-vue';
+import SearchBox from './SearchBox.vue';
+
+test('search event', async ({ mount }) => {
+  let searchQuery = '';
+  
+  const component = await mount(SearchBox, {
+    on: {
+      search: (query: string) => {
+        searchQuery = query;
+      },
+    },
+  });
+  
+  await component.getByRole('textbox').fill('playwright');
+  await component.getByRole('button', { name: 'Search' }).click();
+  
+  expect(searchQuery).toBe('playwright');
+});
+```
+
+## Advanced Testing Patterns
+
+### Test with Context
+
+Provide context/store to components:
+
+<CodeGroup>
+```typescript React Context
+import { test, expect } from '@playwright/experimental-ct-react';
+import { ThemeProvider } from './ThemeContext';
+import Button from './Button';
+
+test('themed button', async ({ mount }) => {
+  const component = await mount(
+    <ThemeProvider theme="dark">
+      <Button>Click me</Button>
+    </ThemeProvider>
+  );
+  
+  await expect(component).toHaveClass(/dark-theme/);
+});
+```
+
+```typescript Vue Provide/Inject
+import { test, expect } from '@playwright/experimental-ct-vue';
+import UserProfile from './UserProfile.vue';
+
+test('with injected user', async ({ mount }) => {
+  const component = await mount(UserProfile, {
+    provide: {
+      user: {
+        name: 'John Doe',
+        isAdmin: true,
+      },
+    },
+  });
+  
+  await expect(component.getByText('Admin Panel')).toBeVisible();
+});
+```
+</CodeGroup>
+
+### Test Hooks and Lifecycle
+
+```typescript
+import { test, expect } from '@playwright/experimental-ct-react';
+import DataFetcher from './DataFetcher';
+
+test('fetch data on mount', async ({ mount, page }) => {
+  // Mock API response
+  await page.route('**/api/data', (route) => {
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({ message: 'Hello from API' }),
+    });
+  });
+  
+  const component = await mount(<DataFetcher />);
+  
+  // Wait for loading to complete
+  await expect(component.getByText('Loading...')).toBeVisible();
+  await expect(component.getByText('Hello from API')).toBeVisible();
+});
+```
+
+### Test Component Interactions
+
+```typescript
+import { test, expect } from '@playwright/experimental-ct-react';
+import Form from './Form';
+
+test('form validation', async ({ mount }) => {
+  const component = await mount(<Form />);
+  
+  // Submit empty form
+  await component.getByRole('button', { name: 'Submit' }).click();
+  await expect(component.getByText('Name is required')).toBeVisible();
+  
+  // Fill valid data
+  await component.getByLabel('Name').fill('John Doe');
+  await component.getByLabel('Email').fill('john@example.com');
+  await component.getByRole('button', { name: 'Submit' }).click();
+  
+  // Verify success
+  await expect(component.getByText('Form submitted')).toBeVisible();
+});
+```
+
+## Configuration
+
+### Component Testing Config
+
+```typescript playwright-ct.config.ts
+import { defineConfig, devices } from '@playwright/experimental-ct-react';
+
+export default defineConfig({
+  testDir: './src',
+  testMatch: '**/*.test.{ts,tsx}',
+  
+  use: {
+    ctPort: 3100,
+    ctViteConfig: {
+      // Vite configuration
+    },
+  },
+  
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+  ],
+});
+```
+
+### Run Component Tests
+
+<Steps>
+  <Step title="Run all component tests">
+    ```bash
+    npm run test:ct
+    ```
+  </Step>
+
+  <Step title="Run in UI mode">
+    ```bash
+    npm run test:ct -- --ui
+    ```
+  </Step>
+
+  <Step title="Run specific test file">
+    ```bash
+    npm run test:ct Button.test.tsx
+    ```
+  </Step>
+
+  <Step title="Debug component tests">
+    ```bash
+    npm run test:ct -- --debug
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Tip>
+  **Test User Behavior**: Focus on testing how users interact with components rather than implementation details.
+</Tip>
+
+- **Test in isolation**: Component tests should focus on a single component
+- **Mock external dependencies**: Use route handlers to mock API calls
+- **Test accessibility**: Verify components are accessible with screen readers
+- **Test edge cases**: Verify components handle empty states and errors
+- **Keep tests fast**: Component tests should run quickly
+- **Use realistic data**: Test with data that matches production scenarios
+
+<Note>
+  Component testing runs in a real browser, providing higher confidence than unit tests while remaining faster than full E2E tests.
+</Note>
+
+## Comparison with E2E Testing
+
+| Aspect | Component Testing | E2E Testing |
+|--------|------------------|-------------|
+| Scope | Single component | Full application |
+| Speed | Fast | Slower |
+| Setup | Minimal | Complex |
+| Dependencies | Mocked | Real |
+| Use Case | Unit/Integration | User flows |
+
+## CI/CD Integration
+
+Run component tests in CI:
+
+```yaml
+name: Component Tests
+
+on: [push, pull_request]
+
+jobs:
+  component-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npm run test:ct
+```
+
+## Troubleshooting
+
+### Component not rendering
+
+Verify the component import and check console for errors:
+
+```typescript
+test('debug render', async ({ mount, page }) => {
+  page.on('console', msg => console.log(msg.text()));
+  const component = await mount(<MyComponent />);
+  // Check if component mounted
+  await expect(component).toBeVisible();
+});
+```
+
+### Vite configuration issues
+
+Customize Vite config in `playwright-ct.config.ts`:
+
+```typescript
+use: {
+  ctViteConfig: {
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
+  },
+},
+```
+
+<Warning>
+  Component testing is experimental. The API may change in future versions.
+</Warning>

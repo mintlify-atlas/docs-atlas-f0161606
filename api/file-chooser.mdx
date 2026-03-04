@@ -1,0 +1,406 @@
+---
+title: FileChooser
+description: API for handling file upload dialogs in Playwright
+---
+
+The FileChooser class represents a file upload dialog that appears when the page requests file input. Handle file uploads using the `page.on('filechooser')` event or by interacting with file input elements directly.
+
+## Overview
+
+```typescript
+import { test } from '@playwright/test';
+
+test('upload file', async ({ page }) => {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.click('#upload-button');
+  
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles('./file.pdf');
+});
+```
+
+## Methods
+
+### element()
+
+Get the input element associated with the file chooser.
+
+**Returns:** `ElementHandle`
+
+```typescript
+const fileChooser = await fileChooserPromise;
+const input = fileChooser.element();
+console.log(await input.getAttribute('accept'));
+```
+
+### isMultiple()
+
+Check if the file chooser accepts multiple files.
+
+**Returns:** `boolean`
+
+Returns `true` if the input element has the `multiple` attribute:
+
+```typescript
+const fileChooser = await fileChooserPromise;
+if (fileChooser.isMultiple()) {
+  console.log('Multiple files can be selected');
+}
+```
+
+### page()
+
+Get the page that opened the file chooser.
+
+**Returns:** `Page`
+
+```typescript
+const fileChooser = await fileChooserPromise;
+const page = fileChooser.page();
+console.log(`File chooser from: ${page.url()}`);
+```
+
+### setFiles(files, options?)
+
+Set files for the file chooser.
+
+<ParamField path="files" type="string | FilePayload | string[] | FilePayload[]" required>
+  Path(s) to file(s) or file payload object(s) to upload
+</ParamField>
+
+<ParamField path="options.timeout" type="number">
+  Maximum time in milliseconds. Defaults to 30000 (30 seconds).
+</ParamField>
+
+<ParamField path="options.noWaitAfter" type="boolean" default="false">
+  If set, don't wait for the file input to be processed after setting files.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+#### File Path
+
+```typescript
+// Single file
+await fileChooser.setFiles('./document.pdf');
+
+// Multiple files
+await fileChooser.setFiles([
+  './file1.pdf',
+  './file2.pdf',
+]);
+```
+
+#### File Payload
+
+```typescript
+import { readFile } from 'fs/promises';
+
+const buffer = await readFile('./document.pdf');
+await fileChooser.setFiles({
+  name: 'document.pdf',
+  mimeType: 'application/pdf',
+  buffer,
+});
+
+// Multiple payloads
+await fileChooser.setFiles([
+  {
+    name: 'file1.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Content 1'),
+  },
+  {
+    name: 'file2.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Content 2'),
+  },
+]);
+```
+
+#### Clear Files
+
+```typescript
+// Clear selection
+await fileChooser.setFiles([]);
+```
+
+## Examples
+
+### Basic File Upload
+
+```typescript
+test('upload single file', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.click('#file-upload-button');
+  
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles('./document.pdf');
+});
+```
+
+### Upload Multiple Files
+
+```typescript
+test('upload multiple files', async ({ page }) => {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.click('#upload-button');
+  
+  const fileChooser = await fileChooserPromise;
+  
+  if (fileChooser.isMultiple()) {
+    await fileChooser.setFiles([
+      './file1.pdf',
+      './file2.pdf',
+      './file3.pdf',
+    ]);
+  }
+});
+```
+
+### Upload from Buffer
+
+```typescript
+test('upload from buffer', async ({ page }) => {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.click('#upload-button');
+  
+  const fileChooser = await fileChooserPromise;
+  
+  // Create file from string
+  await fileChooser.setFiles({
+    name: 'data.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ key: 'value' })),
+  });
+});
+```
+
+### Direct Input Element Upload
+
+```typescript
+test('upload via input element', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Set files directly on input element
+  await page.setInputFiles('#file-input', './document.pdf');
+  
+  // Or multiple files
+  await page.setInputFiles('#file-input', [
+    './file1.pdf',
+    './file2.pdf',
+  ]);
+});
+```
+
+### Check Accepted File Types
+
+```typescript
+test('check accepted types', async ({ page }) => {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.click('#upload-button');
+  
+  const fileChooser = await fileChooserPromise;
+  const input = fileChooser.element();
+  const accept = await input.getAttribute('accept');
+  
+  console.log(`Accepted types: ${accept}`);
+  
+  // Upload appropriate file
+  await fileChooser.setFiles('./document.pdf');
+});
+```
+
+### Cancel File Selection
+
+```typescript
+test('cancel file selection', async ({ page }) => {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.click('#upload-button');
+  
+  const fileChooser = await fileChooserPromise;
+  
+  // Cancel by setting empty array
+  await fileChooser.setFiles([]);
+});
+```
+
+### Upload with Form Submit
+
+```typescript
+test('upload and submit form', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Upload file
+  await page.setInputFiles('#file-input', './document.pdf');
+  
+  // Submit form
+  await page.click('#submit-button');
+  
+  // Wait for upload completion
+  await page.waitForSelector('.success-message');
+});
+```
+
+### Generate Dynamic File
+
+```typescript
+test('upload dynamic file', async ({ page }) => {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.click('#upload-button');
+  
+  const fileChooser = await fileChooserPromise;
+  
+  // Generate CSV content
+  const csvContent = 'Name,Age\nAlice,30\nBob,25';
+  
+  await fileChooser.setFiles({
+    name: 'data.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csvContent),
+  });
+});
+```
+
+### Verify Upload
+
+```typescript
+test('verify file upload', async ({ page }) => {
+  await page.goto('https://example.com');
+  await page.setInputFiles('#file-input', './document.pdf');
+  
+  // Verify file name appears
+  const filename = await page.textContent('.file-name');
+  expect(filename).toBe('document.pdf');
+  
+  // Submit and verify
+  await page.click('#submit');
+  await expect(page.locator('.success')).toBeVisible();
+});
+```
+
+## Best Practices
+
+### Wait Before Triggering
+
+Set up the file chooser listener before the action:
+
+```typescript
+// Good: Wait first
+const fileChooserPromise = page.waitForEvent('filechooser');
+await page.click('#upload-button');
+const fileChooser = await fileChooserPromise;
+
+// Bad: Race condition
+await page.click('#upload-button');
+const fileChooser = await page.waitForEvent('filechooser');
+```
+
+### Use Promise.all
+
+```typescript
+const [fileChooser] = await Promise.all([
+  page.waitForEvent('filechooser'),
+  page.click('#upload-button'),
+]);
+await fileChooser.setFiles('./file.pdf');
+```
+
+### Check Multiple Attribute
+
+Verify if multiple files are expected:
+
+```typescript
+const fileChooser = await fileChooserPromise;
+const files = fileChooser.isMultiple() 
+  ? ['./file1.pdf', './file2.pdf']
+  : './file.pdf';
+await fileChooser.setFiles(files);
+```
+
+### Use setInputFiles for Simple Cases
+
+If you don't need to intercept the file chooser dialog:
+
+```typescript
+// Simpler approach
+await page.setInputFiles('#file-input', './document.pdf');
+
+// Instead of:
+const fileChooserPromise = page.waitForEvent('filechooser');
+await page.click('#file-input');
+const fileChooser = await fileChooserPromise;
+await fileChooser.setFiles('./document.pdf');
+```
+
+### Verify File Type
+
+Check accepted file types before uploading:
+
+```typescript
+const fileChooser = await fileChooserPromise;
+const input = fileChooser.element();
+const accept = await input.getAttribute('accept');
+
+if (accept?.includes('.pdf')) {
+  await fileChooser.setFiles('./document.pdf');
+}
+```
+
+## Common Issues
+
+### File Chooser Not Triggered
+
+Ensure the file input is properly activated:
+
+```typescript
+// Make sure the element is visible and interactable
+await page.locator('#upload-button').waitFor({ state: 'visible' });
+
+const fileChooserPromise = page.waitForEvent('filechooser');
+await page.click('#upload-button');
+const fileChooser = await fileChooserPromise;
+```
+
+### Hidden File Inputs
+
+Some file inputs are hidden with CSS:
+
+```typescript
+// Use setInputFiles directly
+await page.setInputFiles('input[type="file"]', './file.pdf', {
+  // Force even if hidden
+  force: true,
+});
+```
+
+### File Path Issues
+
+Use absolute paths or paths relative to the test file:
+
+```typescript
+import path from 'path';
+
+const filePath = path.join(__dirname, 'fixtures', 'document.pdf');
+await fileChooser.setFiles(filePath);
+```
+
+## Type Definitions
+
+### FilePayload
+
+```typescript
+interface FilePayload {
+  name: string;        // File name
+  mimeType: string;    // MIME type
+  buffer: Buffer;      // File contents
+}
+```
+
+## Related
+
+- [Page](/api/page) - Page object
+- [ElementHandle](/api/element-handle) - Element handle API
+- [Download](/api/download) - File download API

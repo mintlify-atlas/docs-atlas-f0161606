@@ -1,0 +1,295 @@
+---
+title: Tracing
+description: API reference for Playwright Tracing class for recording test traces
+---
+
+The Tracing class enables recording detailed traces of test execution, including screenshots, snapshots, network activity, and console logs. Traces can be viewed in the Playwright Trace Viewer.
+
+## Overview
+
+Access tracing through the browser context:
+
+```typescript
+const tracing = context.tracing;
+```
+
+## Methods
+
+### start
+
+Starts tracing.
+
+```typescript
+await tracing.start();
+await tracing.start({
+  name: 'my-trace',
+  screenshots: true,
+  snapshots: true,
+  sources: true
+});
+```
+
+<ParamField path="options.name" type="string">
+  Trace name. If not specified, the trace name is generated from the test file name and title.
+</ParamField>
+
+<ParamField path="options.title" type="string">
+  Trace title to display in the Trace Viewer.
+</ParamField>
+
+<ParamField path="options.screenshots" type="boolean" default="false">
+  Whether to capture screenshots during tracing.
+</ParamField>
+
+<ParamField path="options.snapshots" type="boolean" default="false">
+  Whether to capture DOM snapshots during tracing.
+</ParamField>
+
+<ParamField path="options.sources" type="boolean" default="false">
+  Whether to include source files in the trace.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### startChunk
+
+Starts a new trace chunk. Useful for recording traces in multiple segments.
+
+```typescript
+await tracing.startChunk();
+await tracing.startChunk({
+  name: 'login-chunk',
+  title: 'Login Flow'
+});
+```
+
+<ParamField path="options.name" type="string">
+  Chunk name.
+</ParamField>
+
+<ParamField path="options.title" type="string">
+  Chunk title to display in the Trace Viewer.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### stopChunk
+
+Stops the current trace chunk and optionally saves it to a file.
+
+```typescript
+await tracing.stopChunk();
+await tracing.stopChunk({ path: 'traces/login.zip' });
+```
+
+<ParamField path="options.path" type="string">
+  Path to save the trace file. If not specified, the trace is discarded.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### stop
+
+Stops tracing and optionally saves it to a file.
+
+```typescript
+await tracing.stop();
+await tracing.stop({ path: 'traces/test.zip' });
+```
+
+<ParamField path="options.path" type="string">
+  Path to save the trace file. If not specified, the trace is discarded.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### group
+
+Creates a logical group in the trace for better organization.
+
+```typescript
+await tracing.group('Authentication');
+await tracing.group('Login Flow', {
+  location: { file: 'tests/auth.spec.ts', line: 10 }
+});
+```
+
+<ParamField path="name" type="string" required>
+  Group name.
+</ParamField>
+
+<ParamField path="options.location" type="{ file: string, line?: number, column?: number }">
+  Source code location for the group.
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### groupEnd
+
+Ends the current trace group.
+
+```typescript
+await tracing.groupEnd();
+```
+
+**Returns:** `Promise<void>`
+
+## Examples
+
+### Basic tracing
+
+```typescript
+import { test } from '@playwright/test';
+
+test('basic trace', async ({ page, context }) => {
+  await context.tracing.start({ screenshots: true, snapshots: true });
+  
+  await page.goto('https://example.com');
+  await page.click('#button');
+  
+  await context.tracing.stop({ path: 'traces/basic-trace.zip' });
+});
+```
+
+### Tracing with chunks
+
+```typescript
+test('trace chunks', async ({ page, context }) => {
+  await context.tracing.start({ screenshots: true, snapshots: true });
+  
+  // First chunk: Login
+  await context.tracing.startChunk({ title: 'Login' });
+  await page.goto('https://example.com/login');
+  await page.fill('#username', 'user');
+  await page.fill('#password', 'pass');
+  await page.click('#login');
+  await context.tracing.stopChunk({ path: 'traces/login.zip' });
+  
+  // Second chunk: Dashboard
+  await context.tracing.startChunk({ title: 'Dashboard' });
+  await page.goto('https://example.com/dashboard');
+  await page.click('#settings');
+  await context.tracing.stopChunk({ path: 'traces/dashboard.zip' });
+  
+  await context.tracing.stop();
+});
+```
+
+### Grouping trace actions
+
+```typescript
+test('trace groups', async ({ page, context }) => {
+  await context.tracing.start({ screenshots: true, snapshots: true });
+  
+  await context.tracing.group('Setup');
+  await page.goto('https://example.com');
+  await context.tracing.groupEnd();
+  
+  await context.tracing.group('User Actions');
+  await page.click('#button1');
+  await page.click('#button2');
+  await context.tracing.groupEnd();
+  
+  await context.tracing.group('Cleanup');
+  await page.click('#logout');
+  await context.tracing.groupEnd();
+  
+  await context.tracing.stop({ path: 'traces/grouped.zip' });
+});
+```
+
+### Conditional tracing
+
+```typescript
+test('conditional trace', async ({ page, context }) => {
+  const shouldTrace = process.env.TRACE === 'true';
+  
+  if (shouldTrace) {
+    await context.tracing.start({ screenshots: true, snapshots: true });
+  }
+  
+  await page.goto('https://example.com');
+  await page.click('#button');
+  
+  if (shouldTrace) {
+    await context.tracing.stop({ path: 'traces/test.zip' });
+  }
+});
+```
+
+### Tracing with source files
+
+```typescript
+test('trace with sources', async ({ page, context }) => {
+  await context.tracing.start({
+    screenshots: true,
+    snapshots: true,
+    sources: true  // Include source files
+  });
+  
+  await page.goto('https://example.com');
+  await page.click('#button');
+  
+  await context.tracing.stop({ path: 'traces/with-sources.zip' });
+});
+```
+
+### Trace on failure
+
+```typescript
+import { test as base } from '@playwright/test';
+
+const test = base.extend({
+  context: async ({ context }, use, testInfo) => {
+    await context.tracing.start({ screenshots: true, snapshots: true });
+    await use(context);
+    
+    // Save trace only on failure
+    if (testInfo.status !== testInfo.expectedStatus) {
+      const tracePath = `traces/${testInfo.title.replace(/\s+/g, '-')}.zip`;
+      await context.tracing.stop({ path: tracePath });
+    } else {
+      await context.tracing.stop();
+    }
+  },
+});
+
+test('example test', async ({ page }) => {
+  await page.goto('https://example.com');
+  // Test will save trace if it fails
+});
+```
+
+### Viewing traces
+
+After collecting traces, view them using the Playwright Trace Viewer:
+
+```bash
+npx playwright show-trace traces/test.zip
+```
+
+Or start the trace viewer server:
+
+```bash
+npx playwright trace-viewer traces/
+```
+
+## Configuration
+
+Configure tracing in `playwright.config.ts`:
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    trace: 'on-first-retry', // 'on', 'off', 'retain-on-failure', 'on-first-retry'
+  },
+});
+```
+
+Options:
+- `'on'`: Record trace for each test
+- `'off'`: Do not record trace
+- `'retain-on-failure'`: Record trace for each test, but remove it if test passes
+- `'on-first-retry'`: Record trace only when retrying a test for the first time

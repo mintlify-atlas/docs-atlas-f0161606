@@ -1,0 +1,379 @@
+---
+title: 'Test Fixtures'
+description: 'Built-in fixtures provided by Playwright Test including page, context, browser, and request'
+---
+
+# Test Fixtures
+
+Playwright Test is based on the concept of test fixtures. Fixtures are used to establish the environment for each test, giving the test everything it needs and nothing else. Fixtures are automatically set up before the test and torn down after.
+
+## Importing
+
+```typescript
+import { test } from '@playwright/test';
+```
+
+## Test-Scoped Fixtures
+
+Test-scoped fixtures are created for each test individually. These fixtures are isolated between tests.
+
+### page
+
+Isolated `Page` instance created for each test.
+
+<ParamField path="page" type="Page">
+  A Playwright Page instance that represents a single tab in the browser. This is the most commonly used fixture.
+</ParamField>
+
+**Example:**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('basic test', async ({ page }) => {
+  await page.goto('https://playwright.dev');
+  await page.getByRole('link', { name: 'Get started' }).click();
+  await expect(page).toHaveTitle(/Getting started/);
+});
+```
+
+**Key Methods:**
+
+- `page.goto(url)` - Navigate to a URL
+- `page.getByRole(role, options)` - Locate element by ARIA role
+- `page.getByText(text)` - Locate element by text content
+- `page.getByLabel(label)` - Locate element by label
+- `page.click(selector)` - Click an element
+- `page.fill(selector, value)` - Fill an input
+- `page.screenshot(options)` - Take a screenshot
+
+### context
+
+Isolated `BrowserContext` instance created for each test.
+
+<ParamField path="context" type="BrowserContext">
+  A browser context that provides isolation between tests. Each context has its own cookies, storage, and cache. The default `page` fixture belongs to this context.
+</ParamField>
+
+**Example:**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('context test', async ({ page, context }) => {
+  // Block external API calls
+  await context.route('**/api.external.com/**', route => route.abort());
+  
+  // Create additional pages in the same context
+  const page2 = await context.newPage();
+  await page2.goto('https://example.com');
+  
+  // Both pages share the same cookies and storage
+  await page.goto('https://example.com');
+});
+```
+
+**Key Methods:**
+
+- `context.newPage()` - Create a new page in this context
+- `context.cookies()` - Get all cookies
+- `context.addCookies(cookies)` - Add cookies
+- `context.storageState()` - Get storage state
+- `context.route(pattern, handler)` - Route network requests
+- `context.grantPermissions(permissions)` - Grant permissions
+
+### request
+
+Isolated `APIRequestContext` instance for making HTTP requests.
+
+<ParamField path="request" type="APIRequestContext">
+  An API request context for making HTTP requests independent of the browser. Useful for API testing and setup/teardown operations.
+</ParamField>
+
+**Example:**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('api test', async ({ request }) => {
+  // Make a POST request
+  const response = await request.post('/api/users', {
+    data: {
+      name: 'John Doe',
+      email: 'john@example.com'
+    }
+  });
+  
+  expect(response.ok()).toBeTruthy();
+  const data = await response.json();
+  expect(data.name).toBe('John Doe');
+});
+
+test('setup with api', async ({ request, page }) => {
+  // Use API to set up test data
+  await request.post('/api/seed', {
+    data: { scenario: 'default' }
+  });
+  
+  // Then test the UI
+  await page.goto('/dashboard');
+});
+```
+
+**Key Methods:**
+
+- `request.get(url, options)` - Make a GET request
+- `request.post(url, options)` - Make a POST request
+- `request.put(url, options)` - Make a PUT request
+- `request.delete(url, options)` - Make a DELETE request
+- `request.fetch(url, options)` - Make a custom request
+
+### agent
+
+AI agent for autonomous browser interactions.
+
+<ParamField path="agent" type="PageAgent">
+  An AI-powered agent that can autonomously interact with the page based on natural language instructions.
+</ParamField>
+
+**Example:**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('agent test', async ({ agent, page }) => {
+  await page.goto('https://example.com');
+  
+  // Let the agent perform actions
+  await agent.perform('Search for "playwright" and click the first result');
+  
+  // Verify the result
+  await expect(page).toHaveURL(/search/);
+});
+```
+
+**Note:** Agent fixtures require configuration with an AI provider. See the [Agent Configuration](/api/test-config#agent-options) section.
+
+## Worker-Scoped Fixtures
+
+Worker-scoped fixtures are created once per worker process and shared between all tests in that worker. This makes testing more efficient.
+
+### browser
+
+Shared `Browser` instance for all tests in the worker.
+
+<ParamField path="browser" type="Browser">
+  A browser instance shared between all tests in the same worker. Each test still gets an isolated context and page.
+</ParamField>
+
+**Example:**
+
+```typescript
+import { test } from '@playwright/test';
+
+test.beforeAll(async ({ browser }) => {
+  // Create a persistent context for all tests
+  const context = await browser.newContext();
+  // Do setup...
+});
+
+test('test 1', async ({ page }) => {
+  // page uses the shared browser
+});
+
+test('test 2', async ({ page }) => {
+  // page uses the same browser instance
+});
+```
+
+**Key Methods:**
+
+- `browser.newContext(options)` - Create a new browser context
+- `browser.newPage(options)` - Create a new page
+- `browser.contexts()` - Get all browser contexts
+- `browser.version()` - Get browser version
+- `browser.browserType()` - Get browser type (chromium, firefox, webkit)
+
+### playwright
+
+Playwright library instance.
+
+<ParamField path="playwright" type="Playwright">
+  The Playwright library object with methods to launch browsers and access utilities.
+</ParamField>
+
+**Example:**
+
+```typescript
+import { test } from '@playwright/test';
+
+test('playwright test', async ({ playwright }) => {
+  // Launch a different browser
+  const firefox = await playwright.firefox.launch();
+  const context = await firefox.newContext();
+  const page = await context.newPage();
+  
+  await page.goto('https://example.com');
+  
+  await context.close();
+  await firefox.close();
+});
+
+test('use devices', async ({ playwright, browser }) => {
+  // Use device descriptors
+  const iPhone = playwright.devices['iPhone 13'];
+  const context = await browser.newContext(iPhone);
+  const page = await context.newPage();
+  
+  await page.goto('https://example.com');
+});
+```
+
+**Key Properties:**
+
+- `playwright.chromium` - Chromium browser type
+- `playwright.firefox` - Firefox browser type
+- `playwright.webkit` - WebKit browser type
+- `playwright.devices` - Device descriptors
+- `playwright.selectors` - Selector engine
+- `playwright.request` - API request context factory
+
+## Custom Fixtures
+
+You can create custom fixtures using `test.extend()`.
+
+### Example: Page Object Fixture
+
+```typescript
+import { test as base } from '@playwright/test';
+import { TodoPage } from './pages/todo-page';
+
+type MyFixtures = {
+  todoPage: TodoPage;
+};
+
+const test = base.extend<MyFixtures>({
+  todoPage: async ({ page }, use) => {
+    const todoPage = new TodoPage(page);
+    await todoPage.goto();
+    await use(todoPage);
+    // Cleanup runs after the test
+  },
+});
+
+export { test };
+```
+
+### Example: API Fixture
+
+```typescript
+import { test as base } from '@playwright/test';
+
+type ApiFixtures = {
+  apiToken: string;
+};
+
+const test = base.extend<ApiFixtures>({
+  apiToken: async ({}, use) => {
+    // Setup: Get a test token
+    const token = await getTestToken();
+    await use(token);
+    // Teardown: Revoke the token
+    await revokeToken(token);
+  },
+});
+
+test('authenticated test', async ({ request, apiToken }) => {
+  const response = await request.get('/api/profile', {
+    headers: { 'Authorization': `Bearer ${apiToken}` }
+  });
+});
+```
+
+### Example: Worker Fixture
+
+```typescript
+import { test as base } from '@playwright/test';
+
+type WorkerFixtures = {
+  database: Database;
+};
+
+const test = base.extend<{}, WorkerFixtures>({
+  database: [async ({}, use) => {
+    // Setup: Connect to database once per worker
+    const db = await connectToDatabase();
+    await use(db);
+    // Teardown: Close connection
+    await db.close();
+  }, { scope: 'worker' }],
+});
+
+test('db test 1', async ({ database }) => {
+  await database.query('SELECT * FROM users');
+});
+
+test('db test 2', async ({ database }) => {
+  // Uses the same database connection
+  await database.query('SELECT * FROM products');
+});
+```
+
+## Fixture Options
+
+When defining custom fixtures, you can specify options:
+
+```typescript
+const test = base.extend<MyFixtures>({
+  myFixture: [
+    async ({}, use) => {
+      await use(value);
+    },
+    {
+      scope: 'test' | 'worker',  // Default: 'test'
+      auto: true | false,         // Auto-use fixture
+      option: true,               // Configurable via config file
+      timeout: 30000,             // Fixture timeout
+    }
+  ],
+});
+```
+
+## TypeScript Definitions
+
+```typescript
+interface PlaywrightTestArgs {
+  page: Page;
+  context: BrowserContext;
+  request: APIRequestContext;
+  agent: PageAgent;
+}
+
+interface PlaywrightWorkerArgs {
+  browser: Browser;
+  playwright: typeof import('playwright-core');
+}
+
+type Fixtures<TestFixtures = {}, WorkerFixtures = {}> = {
+  [K in keyof TestFixtures]:
+    | TestFixtures[K]
+    | [TestFixtures[K], FixtureOptions];
+} & {
+  [K in keyof WorkerFixtures]:
+    | WorkerFixtures[K]
+    | [WorkerFixtures[K], FixtureOptions & { scope: 'worker' }];
+};
+
+interface FixtureOptions {
+  scope?: 'test' | 'worker';
+  auto?: boolean;
+  option?: boolean;
+  timeout?: number;
+}
+```
+
+## See Also
+
+- [Test API](/api/test) - Test functions and methods
+- [Test Configuration](/api/test-config) - Configure fixture options
+- [Custom Fixtures Guide](/guides/fixtures) - Learn more about creating fixtures

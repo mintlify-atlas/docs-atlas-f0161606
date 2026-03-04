@@ -1,0 +1,395 @@
+---
+title: Accessibility
+description: API for capturing accessibility tree snapshots in Playwright
+---
+
+The Accessibility class provides methods to capture snapshots of the accessibility tree. This is useful for automated accessibility testing and understanding how assistive technologies perceive your page.
+
+## Overview
+
+```typescript
+import { test } from '@playwright/test';
+
+test('capture accessibility tree', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const snapshot = await page.accessibility.snapshot();
+  console.log(snapshot);
+});
+```
+
+Note: The Accessibility API is primarily available in Chromium-based browsers. It provides access to the browser's accessibility tree, which is what screen readers and other assistive technologies use.
+
+## Methods
+
+### snapshot(options?)
+
+Capture a snapshot of the accessibility tree.
+
+<ParamField path="options.interestingOnly" type="boolean" default="true">
+  Filter out nodes that are not interesting for most accessibility tests. When false, returns the full tree including nodes that are typically ignored by screen readers.
+</ParamField>
+
+<ParamField path="options.root" type="ElementHandle">
+  Root element to capture the snapshot from. If not specified, captures the entire page.
+</ParamField>
+
+**Returns:** `Promise<AccessibilityNode | null>`
+
+Returns a JSON representation of the accessibility tree. Returns `null` if the root element is not accessible.
+
+#### AccessibilityNode Structure
+
+```typescript
+interface AccessibilityNode {
+  role: string;                    // ARIA role
+  name?: string;                   // Accessible name
+  value?: string | number;         // Current value (for inputs, etc.)
+  description?: string;            // Accessible description
+  keyshortcuts?: string;          // Keyboard shortcuts
+  roledescription?: string;       // Role description
+  valuetext?: string;             // Value text
+  disabled?: boolean;             // Whether the element is disabled
+  expanded?: boolean;             // Expanded state
+  focused?: boolean;              // Focus state
+  modal?: boolean;                // Modal state
+  multiline?: boolean;            // Multiline state
+  multiselectable?: boolean;      // Multiselectable state
+  readonly?: boolean;             // Readonly state
+  required?: boolean;             // Required state
+  selected?: boolean;             // Selected state
+  checked?: boolean | 'mixed';    // Checked state
+  pressed?: boolean | 'mixed';    // Pressed state
+  level?: number;                 // Heading level
+  valuemin?: number;              // Minimum value
+  valuemax?: number;              // Maximum value
+  autocomplete?: string;          // Autocomplete attribute
+  haspopup?: string;              // Has popup attribute
+  invalid?: string;               // Invalid state
+  orientation?: string;           // Orientation
+  children?: AccessibilityNode[]; // Child nodes
+}
+```
+
+## Examples
+
+### Basic Snapshot
+
+```typescript
+test('basic accessibility snapshot', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const snapshot = await page.accessibility.snapshot();
+  console.log(JSON.stringify(snapshot, null, 2));
+});
+```
+
+### Snapshot Specific Element
+
+```typescript
+test('snapshot specific element', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const button = await page.locator('button').elementHandle();
+  const snapshot = await page.accessibility.snapshot({ root: button });
+  
+  expect(snapshot?.role).toBe('button');
+  expect(snapshot?.name).toBe('Submit');
+});
+```
+
+### Full Tree Snapshot
+
+```typescript
+test('full accessibility tree', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Include all nodes, even non-interesting ones
+  const snapshot = await page.accessibility.snapshot({ 
+    interestingOnly: false 
+  });
+  
+  console.log('Full tree:', JSON.stringify(snapshot, null, 2));
+});
+```
+
+### Verify Button Accessibility
+
+```typescript
+test('verify button accessibility', async ({ page }) => {
+  await page.setContent(`
+    <button aria-label="Close dialog">X</button>
+  `);
+  
+  const button = await page.locator('button').elementHandle();
+  const snapshot = await page.accessibility.snapshot({ root: button });
+  
+  expect(snapshot).toMatchObject({
+    role: 'button',
+    name: 'Close dialog',
+  });
+});
+```
+
+### Check Form Accessibility
+
+```typescript
+test('check form accessibility', async ({ page }) => {
+  await page.setContent(`
+    <form>
+      <label for="username">Username</label>
+      <input id="username" type="text" required>
+      
+      <label for="password">Password</label>
+      <input id="password" type="password" required>
+      
+      <button type="submit">Login</button>
+    </form>
+  `);
+  
+  const form = await page.locator('form').elementHandle();
+  const snapshot = await page.accessibility.snapshot({ root: form });
+  
+  // Verify form structure
+  expect(snapshot?.children).toBeDefined();
+  
+  // Find input fields in the tree
+  const findByRole = (node: any, role: string): any[] => {
+    const results: any[] = [];
+    if (node?.role === role) results.push(node);
+    if (node?.children) {
+      for (const child of node.children) {
+        results.push(...findByRole(child, role));
+      }
+    }
+    return results;
+  };
+  
+  const textboxes = findByRole(snapshot, 'textbox');
+  expect(textboxes).toHaveLength(2);
+  expect(textboxes[0]).toMatchObject({
+    role: 'textbox',
+    name: 'Username',
+    required: true,
+  });
+});
+```
+
+### Navigate Accessibility Tree
+
+```typescript
+test('navigate accessibility tree', async ({ page }) => {
+  await page.setContent(`
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/about">About</a></li>
+        <li><a href="/contact">Contact</a></li>
+      </ul>
+    </nav>
+  `);
+  
+  const snapshot = await page.accessibility.snapshot();
+  
+  // Recursively find all links
+  function findLinks(node: any): any[] {
+    let links: any[] = [];
+    if (node?.role === 'link') {
+      links.push(node);
+    }
+    if (node?.children) {
+      for (const child of node.children) {
+        links.push(...findLinks(child));
+      }
+    }
+    return links;
+  }
+  
+  const links = findLinks(snapshot);
+  expect(links).toHaveLength(3);
+  expect(links.map(l => l.name)).toEqual(['Home', 'About', 'Contact']);
+});
+```
+
+### Verify ARIA Attributes
+
+```typescript
+test('verify ARIA attributes', async ({ page }) => {
+  await page.setContent(`
+    <div role="tablist">
+      <button role="tab" aria-selected="true" aria-controls="panel1">
+        Tab 1
+      </button>
+      <button role="tab" aria-selected="false" aria-controls="panel2">
+        Tab 2
+      </button>
+    </div>
+    <div id="panel1" role="tabpanel">Content 1</div>
+    <div id="panel2" role="tabpanel" hidden>Content 2</div>
+  `);
+  
+  const tablist = await page.locator('[role="tablist"]').elementHandle();
+  const snapshot = await page.accessibility.snapshot({ root: tablist });
+  
+  // Verify tab structure
+  expect(snapshot?.role).toBe('tablist');
+  const tabs = snapshot?.children || [];
+  
+  expect(tabs[0]).toMatchObject({
+    role: 'tab',
+    name: 'Tab 1',
+    selected: true,
+  });
+  
+  expect(tabs[1]).toMatchObject({
+    role: 'tab',
+    name: 'Tab 2',
+    selected: false,
+  });
+});
+```
+
+### Check Heading Hierarchy
+
+```typescript
+test('check heading hierarchy', async ({ page }) => {
+  await page.setContent(`
+    <h1>Main Title</h1>
+    <h2>Section 1</h2>
+    <h3>Subsection 1.1</h3>
+    <h2>Section 2</h2>
+  `);
+  
+  const snapshot = await page.accessibility.snapshot();
+  
+  function findHeadings(node: any): any[] {
+    let headings: any[] = [];
+    if (node?.role === 'heading') {
+      headings.push({ name: node.name, level: node.level });
+    }
+    if (node?.children) {
+      for (const child of node.children) {
+        headings.push(...findHeadings(child));
+      }
+    }
+    return headings;
+  }
+  
+  const headings = findHeadings(snapshot);
+  expect(headings).toEqual([
+    { name: 'Main Title', level: 1 },
+    { name: 'Section 1', level: 2 },
+    { name: 'Subsection 1.1', level: 3 },
+    { name: 'Section 2', level: 2 },
+  ]);
+});
+```
+
+## Use Cases
+
+### Automated Accessibility Testing
+
+```typescript
+test('accessibility audit', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const snapshot = await page.accessibility.snapshot();
+  
+  // Custom accessibility checks
+  function auditTree(node: any, issues: string[] = []): string[] {
+    // Check for images without alt text
+    if (node?.role === 'img' && !node.name) {
+      issues.push('Image without accessible name');
+    }
+    
+    // Check for buttons without labels
+    if (node?.role === 'button' && !node.name) {
+      issues.push('Button without accessible name');
+    }
+    
+    // Recurse through children
+    if (node?.children) {
+      for (const child of node.children) {
+        auditTree(child, issues);
+      }
+    }
+    
+    return issues;
+  }
+  
+  const issues = auditTree(snapshot);
+  expect(issues).toHaveLength(0);
+});
+```
+
+### Compare Before and After
+
+```typescript
+test('compare accessibility changes', async ({ page }) => {
+  await page.setContent('<button>Click me</button>');
+  
+  const before = await page.accessibility.snapshot();
+  
+  // Make changes
+  await page.evaluate(() => {
+    document.querySelector('button')!.setAttribute('aria-label', 'Submit form');
+  });
+  
+  const after = await page.accessibility.snapshot();
+  
+  // Compare snapshots
+  expect(before?.children?.[0]?.name).toBe('Click me');
+  expect(after?.children?.[0]?.name).toBe('Submit form');
+});
+```
+
+## Best Practices
+
+### Combine with Role Locators
+
+Use accessibility snapshots together with role-based locators:
+
+```typescript
+// Use role locators for interaction
+await page.getByRole('button', { name: 'Submit' }).click();
+
+// Use snapshots for detailed inspection
+const snapshot = await page.accessibility.snapshot();
+```
+
+### Focus on Interesting Nodes
+
+Keep `interestingOnly: true` (default) for most tests to avoid noise from decorative elements.
+
+### Use for Screen Reader Testing
+
+Snapshots show what screen readers will announce:
+
+```typescript
+const button = await page.locator('button').elementHandle();
+const snapshot = await page.accessibility.snapshot({ root: button });
+
+// This is what a screen reader will announce
+console.log(`Role: ${snapshot?.role}, Name: ${snapshot?.name}`);
+```
+
+## Limitations
+
+- Primarily supported in Chromium-based browsers
+- May not capture all platform-specific accessibility information
+- Does not replace manual accessibility testing with real assistive technologies
+- The tree structure is a snapshot at a point in time
+
+## Browser Compatibility
+
+| Browser | Support |
+|---------|---------|
+| Chromium | ✅ Full support |
+| Firefox | ⚠️ Limited support |
+| WebKit | ⚠️ Limited support |
+
+## Related
+
+- [Role Selectors](/selectors#role-selector) - Select elements by ARIA role
+- [ARIA Snapshot](/aria-snapshot) - Alternative snapshot format
+- [Accessibility Testing](/accessibility-testing) - Comprehensive testing guide

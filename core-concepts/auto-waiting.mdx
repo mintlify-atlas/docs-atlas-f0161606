@@ -1,0 +1,577 @@
+---
+title: Auto-waiting
+description: Understanding Playwright's automatic waiting mechanisms and how they make tests reliable
+---
+
+## What is Auto-waiting?
+
+Playwright **automatically waits** for elements to be ready before performing actions. This eliminates the need for manual waits and makes tests more reliable.
+
+<Note>
+Unlike many testing frameworks that require explicit waits, Playwright waits automatically for actionability checks.
+</Note>
+
+## Actionability Checks
+
+Before performing an action, Playwright waits for the element to pass several checks:
+
+<Steps>
+  <Step title="Attached">
+    Element is attached to the DOM
+  </Step>
+  
+  <Step title="Visible">
+    Element is visible (not `display: none`, `visibility: hidden`, empty `width/height`, etc.)
+  </Step>
+  
+  <Step title="Stable">
+    Element is not animating or moving
+  </Step>
+  
+  <Step title="Enabled">
+    Element is not disabled (for input elements)
+  </Step>
+  
+  <Step title="Editable">
+    Element is not readonly (for input actions like fill)
+  </Step>
+  
+  <Step title="Receives Events">
+    Element is not covered by other elements
+  </Step>
+</Steps>
+
+## Automatic Waiting in Action
+
+```javascript
+// Playwright waits automatically
+await page.click('button');
+
+// Equivalent to manual waiting:
+const button = await page.waitForSelector('button', {
+  state: 'visible',
+  timeout: 30000
+});
+await button.waitForElementState('stable');
+await button.waitForElementState('enabled');
+await button.click();
+```
+
+<Tip>
+You rarely need explicit waits with Playwright. Trust the auto-waiting!
+</Tip>
+
+## Actions with Auto-waiting
+
+All these actions wait automatically:
+
+### Click Actions
+
+```javascript
+// Waits for button to be visible, enabled, and stable
+await page.click('button');
+await page.dblclick('button');
+await page.hover('button');
+await page.tap('button');
+```
+
+### Input Actions
+
+```javascript
+// Waits for input to be visible, enabled, and editable
+await page.fill('input', 'text');
+await page.type('input', 'text');
+await page.press('input', 'Enter');
+```
+
+### Selection Actions
+
+```javascript
+// Waits for element to be visible and enabled
+await page.selectOption('select', 'option1');
+await page.check('checkbox');
+await page.uncheck('checkbox');
+await page.setChecked('checkbox', true);
+```
+
+## Locator Auto-waiting
+
+Locators wait automatically when performing actions:
+
+```javascript
+const button = page.locator('button');
+
+// Each of these waits automatically
+await button.click();
+await button.fill('text');
+await button.selectOption('value');
+```
+
+From client/locator.ts:75-90:
+
+```typescript
+private async _withElement<R>(
+  task: (handle: ElementHandle, timeout?: number) => Promise<R>,
+  options: { title: string, timeout?: number }
+): Promise<R> {
+  const timeout = this._frame._timeout({ timeout: options.timeout });
+  const deadline = timeout ? monotonicTime() + timeout : 0;
+  
+  return await this._frame._wrapApiCall(async () => {
+    // Wait for element to be attached
+    const result = await this._frame._channel.waitForSelector({
+      selector: this._selector,
+      strict: true,
+      state: 'attached',
+      timeout
+    });
+    // Element is ready, perform action
+  });
+}
+```
+
+## Wait States
+
+Playwright supports different wait states:
+
+### attached
+
+```javascript
+// Wait for element to exist in DOM
+await page.waitForSelector('button', { state: 'attached' });
+```
+
+### visible
+
+```javascript
+// Wait for element to be visible (default for most actions)
+await page.waitForSelector('button', { state: 'visible' });
+```
+
+### hidden
+
+```javascript
+// Wait for element to be hidden or removed
+await page.waitForSelector('button', { state: 'hidden' });
+```
+
+### detached
+
+```javascript
+// Wait for element to be removed from DOM
+await page.waitForSelector('button', { state: 'detached' });
+```
+
+## Navigation Auto-waiting
+
+Navigation methods wait for the page to load:
+
+```javascript
+// Waits for 'load' event by default
+await page.goto('https://example.com');
+
+// Wait for different states
+await page.goto('https://example.com', { waitUntil: 'domcontentloaded' });
+await page.goto('https://example.com', { waitUntil: 'networkidle' });
+await page.goto('https://example.com', { waitUntil: 'commit' });
+```
+
+### Load States
+
+- **`load`** - `load` event fired (default)
+- **`domcontentloaded`** - `DOMContentLoaded` event fired
+- **`networkidle`** - No network connections for 500ms
+- **`commit`** - Navigation committed, DOM is interactive
+
+From client/frame.ts:111-115:
+
+```typescript
+async goto(url: string, options: FrameGotoOptions = {}): Promise<Response | null> {
+  const waitUntil = verifyLoadState(
+    'waitUntil',
+    options.waitUntil === undefined ? 'load' : options.waitUntil
+  );
+  return Response.fromNullable(
+    (await this._channel.goto({ url, ...options, waitUntil, timeout: this._navigationTimeout(options) })).response
+  );
+}
+```
+
+## Explicit Waits
+
+When auto-waiting isn't enough, use explicit waits:
+
+### waitForSelector
+
+```javascript
+// Wait for element
+const element = await page.waitForSelector('.dynamic-content');
+
+// With timeout
+const element = await page.waitForSelector('.dynamic-content', {
+  timeout: 10000
+});
+```
+
+### waitForLoadState
+
+```javascript
+// Wait for page to load
+await page.waitForLoadState('load');
+await page.waitForLoadState('domcontentloaded');
+await page.waitForLoadState('networkidle');
+```
+
+### waitForURL
+
+```javascript
+// Wait for specific URL
+await page.waitForURL('**/dashboard');
+
+// Wait for URL pattern
+await page.waitForURL(/\/user\/\d+/);
+
+// With load state
+await page.waitForURL('**/dashboard', {
+  waitUntil: 'networkidle'
+});
+```
+
+### waitForFunction
+
+```javascript
+// Wait for custom condition
+await page.waitForFunction(() => {
+  return document.querySelector('.loading') === null;
+});
+
+// With arguments
+await page.waitForFunction(
+  (minCount) => document.querySelectorAll('.item').length >= minCount,
+  5  // Wait for at least 5 items
+);
+
+// With polling
+await page.waitForFunction(
+  () => document.title === 'Done',
+  { polling: 100 }  // Poll every 100ms
+);
+```
+
+### waitForEvent
+
+```javascript
+// Wait for page event
+const popup = await page.waitForEvent('popup');
+
+// Wait for request
+const request = await page.waitForEvent('request', request => {
+  return request.url().includes('/api/data');
+});
+
+// Wait for response
+const response = await page.waitForEvent('response', response => {
+  return response.url().includes('/api/data') && response.status() === 200;
+});
+```
+
+### waitForRequest
+
+```javascript
+// Wait for specific request
+const request = await page.waitForRequest('**/api/data');
+
+// With predicate
+const request = await page.waitForRequest(request => {
+  return request.url().includes('/api') && request.method() === 'POST';
+});
+```
+
+### waitForResponse
+
+```javascript
+// Wait for specific response
+const response = await page.waitForResponse('**/api/data');
+
+// With predicate
+const response = await page.waitForResponse(response => {
+  return response.url().includes('/api') && response.status() === 200;
+});
+```
+
+### waitForTimeout
+
+```javascript
+// Wait for fixed time (not recommended)
+await page.waitForTimeout(1000);
+```
+
+<Warning>
+Avoid `waitForTimeout` unless absolutely necessary. Use condition-based waits instead.
+</Warning>
+
+## Retries and Stability
+
+Playwright retries checks until they pass or timeout:
+
+```javascript
+// Retries for 30 seconds (default timeout)
+await page.click('button');
+
+// Custom timeout
+await page.click('button', { timeout: 10000 });
+
+// Disable timeout (not recommended)
+await page.click('button', { timeout: 0 });
+```
+
+## Stability Checks
+
+Playwright ensures elements are stable before interacting:
+
+```javascript
+// Waits for element to stop moving
+await page.click('.animated-button');
+
+// Waits for element to stop animating
+await page.click('.fade-in-button');
+```
+
+From the server implementation, stability checks:
+1. Take two element positions
+2. Wait 100ms
+3. Compare positions
+4. Retry if positions changed
+
+## Visibility Checks
+
+Elements must be visible to interact:
+
+```javascript
+// These all wait for visibility
+await page.click('button');
+await page.fill('input', 'text');
+await page.hover('div');
+
+// Check visibility explicitly
+const isVisible = await page.locator('button').isVisible();
+if (isVisible) {
+  await page.click('button');
+}
+```
+
+Visibility criteria:
+- Not `display: none`
+- Not `visibility: hidden`
+- Not `opacity: 0`
+- Has size (`width > 0` and `height > 0`)
+- Not behind other elements
+
+## Editable Checks
+
+Input elements must be editable:
+
+```javascript
+// Waits for input to be editable
+await page.fill('input', 'text');
+
+// Check editable state
+const isEditable = await page.locator('input').isEditable();
+if (isEditable) {
+  await page.fill('input', 'text');
+}
+```
+
+Editable criteria:
+- Not `readonly`
+- Not `disabled`
+- Is an input element
+
+## Enabled Checks
+
+```javascript
+// Waits for button to be enabled
+await page.click('button');
+
+// Check enabled state
+const isEnabled = await page.locator('button').isEnabled();
+if (isEnabled) {
+  await page.click('button');
+}
+```
+
+Enabled criteria:
+- Not `disabled` attribute
+- Not inside disabled fieldset
+- Not disabled via ARIA
+
+## Timeout Configuration
+
+### Default Timeouts
+
+```javascript
+// Set default timeout for all operations
+page.setDefaultTimeout(60000);
+
+// Set default navigation timeout
+page.setDefaultNavigationTimeout(60000);
+
+// At context level
+context.setDefaultTimeout(60000);
+context.setDefaultNavigationTimeout(60000);
+```
+
+### Per-action Timeouts
+
+```javascript
+// Override timeout for specific action
+await page.click('button', { timeout: 10000 });
+await page.goto('https://example.com', { timeout: 60000 });
+await page.waitForSelector('.content', { timeout: 5000 });
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Trust Auto-waiting">
+    Don't add unnecessary explicit waits.
+    
+    ```javascript
+    // Bad
+    await page.waitForTimeout(1000);
+    await page.click('button');
+    
+    // Good
+    await page.click('button');
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Appropriate Wait States">
+    Choose the right wait state for navigation.
+    
+    ```javascript
+    // For SPAs
+    await page.goto('https://example.com', { waitUntil: 'networkidle' });
+    
+    // For static pages
+    await page.goto('https://example.com', { waitUntil: 'domcontentloaded' });
+    ```
+  </Accordion>
+  
+  <Accordion title="Wait for Specific Conditions">
+    Use waitForFunction for complex conditions.
+    
+    ```javascript
+    // Wait for specific state
+    await page.waitForFunction(() => {
+      return window.appReady === true;
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Dynamic Content">
+    Wait for content to stabilize.
+    
+    ```javascript
+    // Wait for list to be populated
+    await page.waitForFunction(() => {
+      return document.querySelectorAll('.item').length > 0;
+    });
+    
+    await page.click('.item:first-child');
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Waits
+
+```javascript
+// Enable verbose logging
+const browser = await chromium.launch({
+  slowMo: 100  // Slow down by 100ms
+});
+
+// Screenshot when element appears
+const element = await page.waitForSelector('.target');
+await element.screenshot({ path: 'found.png' });
+
+// Log waiting steps
+page.on('console', msg => console.log(msg.text()));
+
+await page.evaluate(() => {
+  console.log('Waiting for element...');
+});
+```
+
+## Common Patterns
+
+### Wait for Multiple Elements
+
+```javascript
+// Wait for all elements to appear
+await Promise.all([
+  page.waitForSelector('.header'),
+  page.waitForSelector('.content'),
+  page.waitForSelector('.footer')
+]);
+```
+
+### Wait for API Response
+
+```javascript
+const [response] = await Promise.all([
+  page.waitForResponse('**/api/data'),
+  page.click('button')
+]);
+
+const data = await response.json();
+```
+
+### Wait for Navigation
+
+```javascript
+const [response] = await Promise.all([
+  page.waitForNavigation(),
+  page.click('a.link')
+]);
+
+console.log('Navigated to:', page.url());
+```
+
+### Wait for Element Count
+
+```javascript
+await page.waitForFunction(() => {
+  return document.querySelectorAll('.item').length === 10;
+});
+```
+
+## Error Messages
+
+When waits timeout, Playwright provides helpful errors:
+
+```
+Timeout 30000ms exceeded.
+=========================== logs ===========================
+waiting for locator('button')
+  locator resolved to <button>…</button>
+  attempting click action
+  waiting for element to be visible, enabled and stable
+  element is visible and enabled
+  element is not stable - waiting...
+============================================================
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Test Isolation" icon="shield" href="./test-isolation">
+    Ensuring test independence
+  </Card>
+  <Card title="Assertions" icon="check" href="../api-reference/assertions">
+    Testing expectations
+  </Card>
+  <Card title="Debugging" icon="bug" href="../guides/debugging">
+    Debugging failed tests
+  </Card>
+</CardGroup>

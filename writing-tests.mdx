@@ -1,0 +1,534 @@
+---
+title: Writing tests
+description: Learn how to write effective and maintainable Playwright tests using best practices and real-world examples
+---
+
+Playwright Test provides a rich API for writing end-to-end tests. This guide covers the fundamentals of writing tests, using locators, making assertions, and organizing your test suite.
+
+## Test structure
+
+Playwright tests are written using the `test` function from `@playwright/test`. Each test receives a `page` object for browser interaction.
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('basic test', async ({ page }) => {
+  await page.goto('https://example.com');
+  await expect(page).toHaveTitle(/Example/);
+});
+```
+
+## Locators: Finding elements
+
+Playwright uses locators to find elements on the page. Locators are auto-waiting and retry-able, making tests more reliable.
+
+### Recommended locators
+
+<Tabs>
+  <Tab title="By role">
+    The most resilient way to locate elements (recommended):
+
+    ```typescript
+    // Button
+    await page.getByRole('button', { name: 'Submit' }).click();
+
+    // Text input
+    await page.getByRole('textbox', { name: 'Email' }).fill('user@example.com');
+
+    // Link
+    await page.getByRole('link', { name: 'Learn more' }).click();
+
+    // Heading
+    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
+    ```
+  </Tab>
+
+  <Tab title="By text">
+    Locate elements by their text content:
+
+    ```typescript
+    // Exact text match
+    await page.getByText('Buy groceries').click();
+
+    // Partial match
+    await page.getByText('groceries', { exact: false }).click();
+
+    // Regular expression
+    await page.getByText(/buy.*groceries/i).click();
+    ```
+  </Tab>
+
+  <Tab title="By test ID">
+    Use data-testid attributes for stable selectors:
+
+    ```typescript
+    // HTML: <div data-testid="todo-title">Buy milk</div>
+    await page.getByTestId('todo-title').dblclick();
+
+    // Custom test ID attribute
+    await page.getByTestId('submit-button').click();
+    ```
+  </Tab>
+
+  <Tab title="By label">
+    Locate form inputs by their associated labels:
+
+    ```typescript
+    await page.getByLabel('Email address').fill('user@example.com');
+    await page.getByLabel('Password').fill('secret123');
+    await page.getByLabel('Remember me').check();
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+Prefer `getByRole()` over CSS or XPath selectors. Role-based selectors are more resilient to UI changes and improve accessibility.
+</Tip>
+
+### Chaining and filtering locators
+
+Combine locators to narrow down your selection:
+
+```typescript
+// Find a button within a specific section
+const product = page.getByRole('article').filter({ hasText: 'Product 1' });
+await product.getByRole('button', { name: 'Add to cart' }).click();
+
+// Find element by position
+await page.getByRole('listitem').nth(2).click();
+
+// Find first matching element
+await page.getByRole('button').first().click();
+```
+
+## Web-first assertions
+
+Playwright assertions automatically retry until the condition is met or timeout is reached.
+
+### Common assertions
+
+<CodeGroup>
+
+```typescript Visibility
+// Element is visible
+await expect(page.getByText('Success')).toBeVisible();
+
+// Element is hidden
+await expect(page.getByText('Loading')).toBeHidden();
+```
+
+```typescript Text content
+// Has exact text
+await expect(page.getByTestId('status')).toHaveText('Active');
+
+// Contains text
+await expect(page.getByTestId('message')).toContainText('success');
+
+// Matches pattern
+await expect(page.getByTestId('count')).toHaveText(/\d+ items/);
+```
+
+```typescript Input values
+// Input has value
+await expect(page.getByRole('textbox')).toHaveValue('Buy groceries');
+
+// Checkbox is checked
+await expect(page.getByLabel('Accept terms')).toBeChecked();
+```
+
+```typescript Page state
+// Page title
+await expect(page).toHaveTitle('Dashboard');
+
+// Page URL
+await expect(page).toHaveURL(/.*dashboard/);
+
+// Element count
+await expect(page.getByRole('listitem')).toHaveCount(3);
+```
+
+</CodeGroup>
+
+### Custom timeout for assertions
+
+```typescript
+// Wait up to 10 seconds
+await expect(page.getByText('Processing...')).toBeHidden({ timeout: 10000 });
+```
+
+## Real-world test examples
+
+### Example 1: Form submission
+
+Complete form interaction from the TodoMVC example:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('should add multiple todos', async ({ page }) => {
+  await page.goto('https://demo.playwright.dev/todomvc');
+
+  // Add first todo
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .fill('Buy milk');
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .press('Enter');
+
+  await expect(page.getByText('Buy milk')).toBeVisible();
+  await expect(page.getByText('1 item left')).toBeVisible();
+
+  // Add second todo
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .fill('Walk the dog');
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .press('Enter');
+
+  await expect(page.getByText('Buy milk')).toBeVisible();
+  await expect(page.getByText('Walk the dog')).toBeVisible();
+  await expect(page.getByText('2 items left')).toBeVisible();
+
+  // Add third todo
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .fill('Finish report');
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .press('Enter');
+
+  await expect(page.getByText('Finish report')).toBeVisible();
+  await expect(page.getByText('3 items left')).toBeVisible();
+});
+```
+
+### Example 2: Editing with double-click
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('should edit todo by double-clicking', async ({ page }) => {
+  await page.goto('https://demo.playwright.dev/todomvc');
+
+  // Add a todo
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .fill('Buy milk');
+  await page.getByRole('textbox', { name: 'What needs to be done?' })
+    .press('Enter');
+  await expect(page.getByText('Buy milk')).toBeVisible();
+
+  // Double-click to edit
+  await page.getByTestId('todo-title').dblclick();
+  await expect(page.getByRole('textbox', { name: 'Edit' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Edit' }))
+    .toHaveValue('Buy milk');
+
+  // Change the text
+  await page.getByRole('textbox', { name: 'Edit' }).fill('Buy organic milk');
+  await page.getByRole('textbox', { name: 'Edit' }).press('Enter');
+  await expect(page.getByText('Buy organic milk')).toBeVisible();
+});
+```
+
+### Example 3: API testing
+
+Test REST APIs directly from the GitHub API example:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.use({
+  baseURL: 'https://api.github.com',
+  extraHTTPHeaders: {
+    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': `token ${process.env.API_TOKEN}`,
+  }
+});
+
+test('should create bug report', async ({ request }) => {
+  const user = process.env.GITHUB_USER;
+  const repo = 'test-repo';
+
+  // Create a new issue
+  const newIssue = await request.post(`/repos/${user}/${repo}/issues`, {
+    data: {
+      title: '[Bug] report 1',
+      body: 'Bug description',
+    }
+  });
+  expect(newIssue.ok()).toBeTruthy();
+
+  // Verify the issue was created
+  const issues = await request.get(`/repos/${user}/${repo}/issues`);
+  expect(issues.ok()).toBeTruthy();
+  expect(await issues.json()).toContainEqual(expect.objectContaining({
+    title: '[Bug] report 1',
+    body: 'Bug description'
+  }));
+});
+```
+
+### Example 4: Mocking browser APIs
+
+Mock the Battery API from the mock-battery example:
+
+```javascript
+const { test, expect } = require('@playwright/test');
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const mockBattery = {
+      level: 0.90,
+      charging: true,
+      chargingTime: 1800,
+      dischargingTime: Infinity,
+      addEventListener: () => { }
+    };
+    delete window.navigator.battery;
+    window.navigator.getBattery = async () => mockBattery;
+  });
+});
+
+test('show battery status', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.battery-percentage')).toHaveText('90%');
+  await expect(page.locator('.battery-status')).toHaveText('Adapter');
+  await expect(page.locator('.battery-fully')).toHaveText('00:30');
+});
+```
+
+## Organizing tests
+
+### Test groups
+
+Organize related tests with `test.describe()`:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Adding Todos', () => {
+  test('should add single todo', async ({ page }) => {
+    // Test implementation
+  });
+
+  test('should add multiple todos', async ({ page }) => {
+    // Test implementation
+  });
+
+  test('should not add empty todo', async ({ page }) => {
+    // Test implementation
+  });
+});
+```
+
+### Test hooks
+
+Set up and tear down test state:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('User Dashboard', () => {
+  test.beforeEach(async ({ page }) => {
+    // Run before each test
+    await page.goto('https://example.com/login');
+    await page.getByLabel('Email').fill('user@example.com');
+    await page.getByLabel('Password').fill('password');
+    await page.getByRole('button', { name: 'Sign in' }).click();
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Run after each test
+    await page.getByRole('button', { name: 'Logout' }).click();
+  });
+
+  test('should display user profile', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Dashboard' }))
+      .toBeVisible();
+  });
+});
+```
+
+### Custom fixtures
+
+Extend test context with reusable setup:
+
+```typescript
+import { test as baseTest } from '@playwright/test';
+
+export const test = baseTest.extend({
+  // Custom fixture: auto-navigate to TodoMVC
+  page: async ({ page }, use) => {
+    await page.goto('https://demo.playwright.dev/todomvc');
+    await use(page);
+  },
+});
+
+export { expect } from '@playwright/test';
+```
+
+## Configuration
+
+Configure test behavior in `playwright.config.ts`:
+
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  timeout: 30000,
+  expect: {
+    timeout: 5000
+  },
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [['html'], ['list']],
+  use: {
+    actionTimeout: 0,
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+    // Mobile viewports
+    {
+      name: 'Mobile Chrome',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 12'] },
+    },
+  ],
+});
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Use web-first assertions">
+    Always use Playwright's `expect()` assertions instead of regular assertions. They automatically retry and wait for conditions to be met.
+
+    ```typescript
+    // Good: Auto-waiting assertion
+    await expect(page.getByText('Success')).toBeVisible();
+
+    // Bad: No auto-waiting
+    const text = await page.getByText('Success').textContent();
+    expect(text).toBe('Success');
+    ```
+  </Accordion>
+
+  <Accordion title="Avoid manual waits">
+    Don't use `setTimeout()` or `page.waitForTimeout()`. Playwright's auto-waiting handles timing automatically.
+
+    ```typescript
+    // Good: Auto-waiting
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await expect(page.getByText('Success')).toBeVisible();
+
+    // Bad: Manual timeout
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await page.waitForTimeout(1000);
+    ```
+  </Accordion>
+
+  <Accordion title="Use meaningful test descriptions">
+    Test names should clearly describe what they verify:
+
+    ```typescript
+    // Good: Clear description
+    test('should display error message when email is invalid', async ({ page }) => {
+      // Test implementation
+    });
+
+    // Bad: Vague description
+    test('test 1', async ({ page }) => {
+      // Test implementation
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Keep tests independent">
+    Each test should be able to run in isolation. Don't rely on the order of test execution.
+
+    ```typescript
+    // Good: Self-contained test
+    test('should add todo', async ({ page }) => {
+      await page.goto('https://demo.playwright.dev/todomvc');
+      await page.getByRole('textbox').fill('Buy milk');
+      await page.keyboard.press('Enter');
+      await expect(page.getByText('Buy milk')).toBeVisible();
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Use test fixtures for common setup">
+    Extract repeated setup code into custom fixtures to keep tests DRY:
+
+    ```typescript
+    // Create fixture
+    export const test = baseTest.extend({
+      authenticatedPage: async ({ page }, use) => {
+        await page.goto('/login');
+        await page.getByLabel('Email').fill('user@example.com');
+        await page.getByLabel('Password').fill('password');
+        await page.getByRole('button', { name: 'Login' }).click();
+        await use(page);
+      },
+    });
+
+    // Use in tests
+    test('should access dashboard', async ({ authenticatedPage }) => {
+      await expect(authenticatedPage.getByText('Welcome')).toBeVisible();
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+**Common mistakes to avoid**:
+- Forgetting `await` before async operations
+- Using CSS selectors instead of semantic locators
+- Not using web-first assertions
+- Adding manual timeouts
+- Making tests dependent on each other
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Locators" icon="crosshairs" href="/locators">
+    Deep dive into locator strategies
+  </Card>
+  <Card title="Assertions" icon="check" href="/assertions">
+    Master web-first assertions
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure advanced test options
+  </Card>
+  <Card title="Best practices" icon="star" href="/best-practices">
+    Learn testing best practices
+  </Card>
+</CardGroup>
+
+## Auto-waiting behavior
+
+<Info>
+Playwright automatically waits for elements to be:
+- Attached to the DOM
+- Visible on the page
+- Stable (not animating)
+- Enabled and not disabled
+- Not covered by other elements
+
+This eliminates the need for manual waits and reduces flaky tests.
+</Info>

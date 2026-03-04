@@ -1,0 +1,450 @@
+---
+title: 'Test Fixtures'
+description: 'Learn how to use and create test fixtures in Playwright for dependency injection and test setup'
+---
+
+## Introduction
+
+Fixtures are Playwright's dependency injection system for tests. They provide a way to set up the test environment and share objects between tests.
+
+## Built-in Fixtures
+
+Playwright provides several built-in fixtures from `src/index.ts:71-520`:
+
+### Browser Fixtures
+
+<ParamField path="browser" type="Browser" scope="worker">
+  Shared browser instance across tests in the same worker
+
+  ```typescript
+  test('browser example', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('https://example.com');
+  });
+  ```
+</ParamField>
+
+<ParamField path="browserName" type="string" scope="worker">
+  Browser name: 'chromium', 'firefox', or 'webkit'
+
+  From `src/index.ts:73`:
+  ```typescript
+  browserName: 'chromium'  // or 'firefox' or 'webkit'
+  ```
+</ParamField>
+
+<ParamField path="context" type="BrowserContext" scope="test">
+  Isolated browser context for each test
+
+  ```typescript
+  test('context example', async ({ context }) => {
+    await context.route('**/*', route => route.continue());
+    const page = await context.newPage();
+  });
+  ```
+</ParamField>
+
+<ParamField path="page" type="Page" scope="test">
+  Isolated page for each test
+
+  ```typescript
+  test('page example', async ({ page }) => {
+    await page.goto('https://example.com');
+    await page.click('button');
+  });
+  ```
+</ParamField>
+
+### Request Fixtures
+
+<ParamField path="request" type="APIRequestContext" scope="test">
+  API request context for testing REST APIs
+
+  From `src/index.ts:505-519`:
+  ```typescript
+  test('api test', async ({ request }) => {
+    const response = await request.get('https://api.example.com/data');
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+  });
+  ```
+</ParamField>
+
+## Fixture Scopes
+
+From `src/common/fixtures.ts:25-27`, fixtures have two scopes:
+
+### Test-Scoped Fixtures
+
+Created for each test:
+
+```typescript
+const fixtures = {
+  todoPage: async ({ page }, use) => {
+    const todoPage = new TodoPage(page);
+    await todoPage.goto();
+    await use(todoPage);
+    // Cleanup runs after test
+  },
+};
+```
+
+### Worker-Scoped Fixtures
+
+Shared across all tests in a worker:
+
+```typescript
+const fixtures = {
+  database: [async ({}, use) => {
+    const db = await createDatabase();
+    await use(db);
+    await db.close();
+  }, { scope: 'worker' }],
+};
+```
+
+## Creating Custom Fixtures
+
+Extend the base test with custom fixtures:
+
+```typescript
+import { test as base } from '@playwright/test';
+
+type MyFixtures = {
+  todoPage: TodoPage;
+  settingsPage: SettingsPage;
+};
+
+export const test = base.extend<MyFixtures>({
+  todoPage: async ({ page }, use) => {
+    const todoPage = new TodoPage(page);
+    await use(todoPage);
+  },
+  
+  settingsPage: async ({ page }, use) => {
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.goto();
+    await use(settingsPage);
+  },
+});
+```
+
+### Using Custom Fixtures
+
+```typescript
+import { test } from './fixtures';
+
+test('add todo', async ({ todoPage }) => {
+  await todoPage.addTodo('Buy milk');
+  await todoPage.assertTodoCount(1);
+});
+
+test('change settings', async ({ settingsPage }) => {
+  await settingsPage.enableDarkMode();
+});
+```
+
+## Fixture Options
+
+From `src/common/fixtures.ts:28-29,108-119`:
+
+### Option Fixtures
+
+Fixtures that can be configured:
+
+```typescript
+type MyFixtures = {
+  defaultItem: string;
+};
+
+export const test = base.extend<MyFixtures>({
+  defaultItem: ['', { option: true }],
+});
+
+// Configure in playwright.config.ts
+export default {
+  use: {
+    defaultItem: 'Sample Item',
+  },
+};
+```
+
+### Auto Fixtures
+
+Fixtures that run automatically:
+
+From `src/common/fixtures.ts:26,38-39`:
+
+```typescript
+export const test = base.extend({
+  autoScreenshot: [async ({ page }, use, testInfo) => {
+    await use();
+    // Runs after every test automatically
+    if (testInfo.status !== 'passed') {
+      await page.screenshot({ path: 'failure.png' });
+    }
+  }, { auto: true }],
+});
+```
+
+### Fixture Timeout
+
+From `src/common/fixtures.ts:44-45`:
+
+```typescript
+export const test = base.extend({
+  slowFixture: [async ({}, use) => {
+    // This fixture has its own timeout
+    await use();
+  }, { timeout: 60000 }],
+});
+```
+
+## Fixture Dependencies
+
+Fixtures can depend on other fixtures:
+
+From `src/common/fixtures.ts:46-47,231-237`:
+
+```typescript
+type MyFixtures = {
+  database: Database;
+  apiClient: ApiClient;
+  authenticatedUser: User;
+};
+
+export const test = base.extend<MyFixtures>({
+  database: [async ({}, use) => {
+    const db = await Database.connect();
+    await use(db);
+    await db.disconnect();
+  }, { scope: 'worker' }],
+  
+  apiClient: async ({ baseURL }, use) => {
+    const client = new ApiClient(baseURL);
+    await use(client);
+  },
+  
+  authenticatedUser: async ({ apiClient }, use) => {
+    const user = await apiClient.login('user', 'pass');
+    await use(user);
+    await apiClient.logout();
+  },
+});
+```
+
+### Fixture Dependency Rules
+
+From `src/common/fixtures.ts:164-230`:
+
+1. **Scope Compatibility**: Test-scoped fixtures can depend on worker-scoped fixtures, but not vice versa
+2. **No Circular Dependencies**: Fixtures cannot have circular dependencies
+3. **Override Inheritance**: Fixtures can override previous definitions using `super`
+
+```typescript
+export const test = base.extend({
+  page: async ({ page }, use) => {
+    // Override built-in page fixture
+    await page.goto('https://example.com');
+    await use(page);
+  },
+});
+```
+
+## Advanced Fixture Patterns
+
+### Page Object Model
+
+```typescript
+import { test as base } from '@playwright/test';
+
+class TodoPage {
+  constructor(private page: Page) {}
+  
+  async goto() {
+    await this.page.goto('/');
+  }
+  
+  async addTodo(text: string) {
+    await this.page.fill('input.new-todo', text);
+    await this.page.press('input.new-todo', 'Enter');
+  }
+  
+  async assertTodoCount(count: number) {
+    await expect(this.page.locator('.todo-list li')).toHaveCount(count);
+  }
+}
+
+type Fixtures = {
+  todoPage: TodoPage;
+};
+
+export const test = base.extend<Fixtures>({
+  todoPage: async ({ page }, use) => {
+    const todoPage = new TodoPage(page);
+    await todoPage.goto();
+    await use(todoPage);
+  },
+});
+```
+
+### Authenticated Context
+
+```typescript
+type AuthFixtures = {
+  authenticatedPage: Page;
+};
+
+export const test = base.extend<AuthFixtures>({
+  authenticatedPage: async ({ browser }, use) => {
+    const context = await browser.newContext({
+      storageState: 'auth.json',
+    });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
+  },
+});
+
+test('user dashboard', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/dashboard');
+});
+```
+
+### Shared Test Data
+
+```typescript
+type DataFixtures = {
+  testData: TestData;
+};
+
+export const test = base.extend<DataFixtures>({
+  testData: [async ({}, use) => {
+    const data = await loadTestData();
+    await use(data);
+    await cleanupTestData(data);
+  }, { scope: 'worker' }],
+});
+
+test('use test data', async ({ testData }) => {
+  console.log(testData.users[0].name);
+});
+```
+
+## Fixture Debugging
+
+From `src/common/fixtures.ts:249-251`:
+
+```typescript
+// Use box option to hide internal fixtures from traces
+export const test = base.extend({
+  internalHelper: [async ({}, use) => {
+    await use('helper');
+  }, { box: true }],  // Hidden from trace
+});
+```
+
+## Built-in Fixture Configuration
+
+From `src/index.ts:71-157`:
+
+```typescript
+export default defineConfig({
+  use: {
+    // Browser options (worker scope)
+    browserName: 'chromium',
+    headless: true,
+    channel: 'chrome',
+    
+    // Context options (test scope)
+    viewport: { width: 1280, height: 720 },
+    actionTimeout: 0,
+    navigationTimeout: 0,
+    baseURL: 'http://localhost:3000',
+    
+    // Recording
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'on-first-retry',
+  },
+});
+```
+
+## Fixture Execution Order
+
+Fixtures are initialized in dependency order:
+
+```typescript
+export const test = base.extend({
+  a: async ({}, use) => {
+    console.log('Setup A');
+    await use('a');
+    console.log('Teardown A');
+  },
+  
+  b: async ({ a }, use) => {
+    console.log('Setup B');
+    await use('b');
+    console.log('Teardown B');
+  },
+  
+  c: async ({ b }, use) => {
+    console.log('Setup C');
+    await use('c');
+    console.log('Teardown C');
+  },
+});
+
+test('example', async ({ c }) => {
+  console.log('Test body');
+});
+
+// Output:
+// Setup A
+// Setup B
+// Setup C
+// Test body
+// Teardown C
+// Teardown B
+// Teardown A
+```
+
+## Merging Test Types
+
+From `src/common/testType.ts:315-326`:
+
+```typescript
+import { mergeTests } from '@playwright/test';
+import { test as dbTest } from './db-fixtures';
+import { test as apiTest } from './api-fixtures';
+
+export const test = mergeTests(dbTest, apiTest);
+
+test('combined test', async ({ database, apiClient }) => {
+  // Use fixtures from both test types
+});
+```
+
+<Note>
+`mergeTests` combines fixtures from multiple test types while avoiding duplication of shared fixtures.
+</Note>
+
+## Best Practices
+
+1. **Keep fixtures focused**: Each fixture should have a single responsibility
+2. **Use appropriate scope**: Worker-scoped fixtures for expensive operations
+3. **Avoid side effects**: Fixtures should be independent and not affect each other
+4. **Clean up resources**: Always clean up in the teardown phase
+5. **Type your fixtures**: Use TypeScript for better IntelliSense
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Test Hooks" icon="hook" href="/test-runner/test-hooks">
+    Learn about beforeEach and afterEach hooks
+  </Card>
+  <Card title="Configuration" icon="gear" href="/test-runner/configuration">
+    Configure fixture options
+  </Card>
+</CardGroup>

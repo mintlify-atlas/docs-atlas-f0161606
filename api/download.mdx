@@ -1,0 +1,408 @@
+---
+title: Download
+description: API for handling file downloads in Playwright
+---
+
+The Download class represents a file download initiated by the page. Downloads are created when a page triggers a file download, and you can handle them using the `page.on('download')` event.
+
+## Overview
+
+```typescript
+import { test } from '@playwright/test';
+
+test('download file', async ({ page }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#download-button');
+  
+  const download = await downloadPromise;
+  const path = await download.path();
+  console.log(`Downloaded to: ${path}`);
+});
+```
+
+## Methods
+
+### url()
+
+Get the download URL.
+
+**Returns:** `string`
+
+```typescript
+const download = await downloadPromise;
+console.log(`Downloading from: ${download.url()}`);
+```
+
+### suggestedFilename()
+
+Get the suggested filename from the server.
+
+**Returns:** `string`
+
+This is the filename suggested by the `Content-Disposition` header or derived from the URL:
+
+```typescript
+const download = await downloadPromise;
+const filename = download.suggestedFilename();
+console.log(`Suggested filename: ${filename}`);
+```
+
+### path()
+
+Get the path to the downloaded file.
+
+**Returns:** `Promise<string>`
+
+Waits for the download to finish and returns the path to the downloaded file:
+
+```typescript
+const download = await downloadPromise;
+const path = await download.path();
+console.log(`File saved at: ${path}`);
+```
+
+### saveAs(path)
+
+Save the download to a specific path.
+
+<ParamField path="path" type="string" required>
+  Path where the file should be saved
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+const download = await downloadPromise;
+await download.saveAs('/path/to/save/file.pdf');
+```
+
+### failure()
+
+Get the failure reason if the download failed.
+
+**Returns:** `Promise<string | null>`
+
+Returns `null` if the download was successful:
+
+```typescript
+const download = await downloadPromise;
+const error = await download.failure();
+if (error) {
+  console.error(`Download failed: ${error}`);
+}
+```
+
+### createReadStream()
+
+Get a readable stream for the downloaded file.
+
+**Returns:** `Promise<Readable>`
+
+Useful for processing large files without loading them entirely into memory:
+
+```typescript
+import { createWriteStream } from 'fs';
+
+const download = await downloadPromise;
+const stream = await download.createReadStream();
+const writeStream = createWriteStream('/path/to/output.pdf');
+stream.pipe(writeStream);
+```
+
+### cancel()
+
+Cancel the download.
+
+**Returns:** `Promise<void>`
+
+```typescript
+const download = await downloadPromise;
+await download.cancel();
+```
+
+### delete()
+
+Delete the downloaded file.
+
+**Returns:** `Promise<void>`
+
+```typescript
+const download = await downloadPromise;
+await download.path(); // Wait for download to complete
+await download.delete(); // Delete the file
+```
+
+### page()
+
+Get the page that initiated the download.
+
+**Returns:** `Page`
+
+```typescript
+const download = await downloadPromise;
+const page = download.page();
+console.log(`Download from: ${page.url()}`);
+```
+
+## Examples
+
+### Basic Download
+
+```typescript
+test('download file', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('a[href="/files/document.pdf"]');
+  
+  const download = await downloadPromise;
+  await download.saveAs('./downloads/document.pdf');
+});
+```
+
+### Check Download Success
+
+```typescript
+test('verify download', async ({ page }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#download-button');
+  
+  const download = await downloadPromise;
+  
+  // Check if download succeeded
+  const failure = await download.failure();
+  expect(failure).toBeNull();
+  
+  // Verify filename
+  expect(download.suggestedFilename()).toBe('report.pdf');
+});
+```
+
+### Save with Suggested Filename
+
+```typescript
+test('save with suggested name', async ({ page }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#download-button');
+  
+  const download = await downloadPromise;
+  const filename = download.suggestedFilename();
+  await download.saveAs(`./downloads/${filename}`);
+});
+```
+
+### Stream Large File
+
+```typescript
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+
+test('stream large download', async ({ page }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#download-large-file');
+  
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const writeStream = createWriteStream('./large-file.zip');
+  
+  await pipeline(stream, writeStream);
+});
+```
+
+### Handle Multiple Downloads
+
+```typescript
+test('multiple downloads', async ({ page }) => {
+  const downloads: Download[] = [];
+  
+  page.on('download', download => {
+    downloads.push(download);
+  });
+  
+  await page.goto('https://example.com');
+  await page.click('#download-all');
+  
+  // Wait for all downloads
+  await page.waitForTimeout(5000);
+  
+  // Save all downloads
+  for (const download of downloads) {
+    const filename = download.suggestedFilename();
+    await download.saveAs(`./downloads/${filename}`);
+  }
+  
+  expect(downloads).toHaveLength(3);
+});
+```
+
+### Cancel Download
+
+```typescript
+test('cancel download', async ({ page }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#download-button');
+  
+  const download = await downloadPromise;
+  
+  // Cancel immediately
+  await download.cancel();
+  
+  // Verify cancellation
+  const failure = await download.failure();
+  expect(failure).not.toBeNull();
+});
+```
+
+### Verify Download Content
+
+```typescript
+import { readFile } from 'fs/promises';
+
+test('verify download content', async ({ page }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#download-button');
+  
+  const download = await downloadPromise;
+  const path = await download.path();
+  
+  // Read and verify content
+  const content = await readFile(path, 'utf-8');
+  expect(content).toContain('Expected data');
+  
+  // Clean up
+  await download.delete();
+});
+```
+
+### Download from Link Click
+
+```typescript
+test('download from link', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('text=Download Report'),
+  ]);
+  
+  const path = await download.path();
+  console.log(`Downloaded to: ${path}`);
+});
+```
+
+### Wait for Download with Timeout
+
+```typescript
+test('download with timeout', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  const downloadPromise = page.waitForEvent('download', {
+    timeout: 30000, // 30 seconds
+  });
+  
+  await page.click('#download-button');
+  
+  try {
+    const download = await downloadPromise;
+    await download.saveAs('./downloads/file.pdf');
+  } catch (error) {
+    console.error('Download timeout');
+  }
+});
+```
+
+## Best Practices
+
+### Wait Before Clicking
+
+Set up the download listener before triggering the download:
+
+```typescript
+// Good: Wait first
+const downloadPromise = page.waitForEvent('download');
+await page.click('#download-button');
+const download = await downloadPromise;
+
+// Bad: Race condition
+await page.click('#download-button');
+const download = await page.waitForEvent('download'); // Might miss it
+```
+
+### Use Promise.all for Simultaneous Actions
+
+```typescript
+const [download] = await Promise.all([
+  page.waitForEvent('download'),
+  page.click('#download-button'),
+]);
+```
+
+### Clean Up Downloads
+
+Delete temporary downloads after testing:
+
+```typescript
+test('cleanup downloads', async ({ page }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#download-button');
+  
+  const download = await downloadPromise;
+  const path = await download.path();
+  
+  try {
+    // Test the download
+    expect(path).toBeTruthy();
+  } finally {
+    // Clean up
+    await download.delete();
+  }
+});
+```
+
+### Handle Download Failures
+
+```typescript
+const download = await downloadPromise;
+const failure = await download.failure();
+
+if (failure) {
+  throw new Error(`Download failed: ${failure}`);
+}
+
+const path = await download.path();
+```
+
+## Common Issues
+
+### Download Not Triggered
+
+Ensure the download actually starts:
+
+```typescript
+// Set up a timeout
+const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
+
+try {
+  await page.click('#download-button');
+  const download = await downloadPromise;
+} catch (error) {
+  console.error('Download was not triggered');
+}
+```
+
+### Popup Downloads
+
+Handle downloads from popups:
+
+```typescript
+const [popup, download] = await Promise.all([
+  page.waitForEvent('popup'),
+  page.waitForEvent('download'),
+  page.click('#download-in-popup'),
+]);
+```
+
+## Related
+
+- [Page](/api/page) - Page object
+- [File Uploads](/file-uploads) - Handling file uploads

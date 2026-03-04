@@ -1,0 +1,230 @@
+---
+title: Architecture
+description: Understanding Playwright's internal architecture and how components communicate
+---
+
+## Overview
+
+Playwright is built on a client-server architecture where your test code (client) communicates with browser instances (server) through a protocol-based messaging system. This design enables Playwright to control browsers remotely and provide powerful automation capabilities.
+
+## Core Components
+
+### Client Layer
+
+The client layer is what you interact with in your test code. It consists of several key classes:
+
+- **`Browser`** - Represents a browser instance (client/browser.ts:31)
+- **`BrowserContext`** - Isolated browser session (client/browserContext.ts:58)
+- **`Page`** - Individual tab or page (client/page.ts:80)
+- **`Frame`** - Frame within a page (client/frame.ts:48)
+- **`Locator`** - Element selector and action wrapper (client/locator.ts:40)
+
+### Server Layer
+
+The server layer runs in a separate process and controls the actual browser:
+
+- **`BrowserType`** - Browser launcher and manager (server/browserType.ts:48)
+- **`BrowserServer`** - Browser process manager
+- **Browser-specific implementations** - Chromium, Firefox, and WebKit adapters
+
+### Communication Protocol
+
+Playwright uses a **channel-based protocol** for client-server communication:
+
+```typescript
+// From client/browser.ts:31
+export class Browser extends ChannelOwner<channels.BrowserChannel> {
+  readonly _contexts = new Set<BrowserContext>();
+  private _isConnected = true;
+  
+  constructor(parent: ChannelOwner, type: string, guid: string, initializer: channels.BrowserInitializer) {
+    super(parent, type, guid, initializer);
+    this._channel.on('context', ({ context }) => this._didCreateContext(BrowserContext.from(context)));
+    this._channel.on('close', () => this._didClose());
+  }
+}
+```
+
+Each object has:
+- **GUID** - Unique identifier for remote object
+- **Channel** - Message pipe for method calls and events
+- **Initializer** - Initial state from server
+
+## Object Hierarchy
+
+<Steps>
+  <Step title="Playwright">
+    Root object that provides browser launchers
+  </Step>
+  <Step title="BrowserType">
+    Provides methods to launch or connect to browsers (chromium, firefox, webkit)
+  </Step>
+  <Step title="Browser">
+    Browser instance with multiple contexts
+  </Step>
+  <Step title="BrowserContext">
+    Isolated session with independent cookies, storage, and cache
+  </Step>
+  <Step title="Page">
+    Individual tab within a context
+  </Step>
+  <Step title="Frame">
+    Main frame or iframe within a page
+  </Step>
+</Steps>
+
+## Context Creation Flow
+
+When you create a new browser context, here's what happens internally:
+
+```typescript
+// From client/browser.ts:58-90
+async newContext(options: BrowserContextOptions = {}): Promise<BrowserContext> {
+  // 1. Prepare context options with selectors
+  const options = this._browserType._playwright.selectors._withSelectorOptions(userOptions);
+  
+  // 2. Run before-create instrumentation
+  await this._instrumentation.runBeforeCreateBrowserContext(options);
+  
+  // 3. Send create command to server
+  const contextOptions = await prepareBrowserContextParams(this._platform, options);
+  const response = await this._channel.newContext(contextOptions);
+  
+  // 4. Get context proxy object
+  const context = BrowserContext.from(response.context);
+  
+  // 5. Run after-create instrumentation
+  await this._instrumentation.runAfterCreateBrowserContext(context);
+  
+  return context;
+}
+```
+
+<Note>
+The `_channel` object handles serialization, network transport, and deserialization automatically.
+</Note>
+
+## Event System
+
+Playwright uses event emitters for asynchronous notifications:
+
+```typescript
+// From client/browserContext.ts:102-112
+this._channel.on('page', ({ page }) => this._onPage(Page.from(page)));
+this._channel.on('route', ({ route }) => this._onRoute(network.Route.from(route)));
+this._channel.on('serviceWorker', ({ worker }) => {
+  const serviceWorker = Worker.from(worker);
+  serviceWorker._context = this;
+  this._serviceWorkers.add(serviceWorker);
+  this.emit(Events.BrowserContext.ServiceWorker, serviceWorker);
+});
+```
+
+Events bubble up the hierarchy:
+- Frame events → Page events → Context events
+- Network events are emitted at both Page and Context levels
+
+## Resource Management
+
+Playwright implements proper cleanup:
+
+```typescript
+// From client/browser.ts:176-189
+async close(options: { reason?: string } = {}): Promise<void> {
+  this._closeReason = options.reason;
+  try {
+    if (this._shouldCloseConnectionOnClose)
+      this._connection.close();
+    else
+      await this._channel.close(options);
+    await this._closedPromise;
+  } catch (e) {
+    if (isTargetClosedError(e))
+      return;
+    throw e;
+  }
+}
+```
+
+<Warning>
+Always close browsers, contexts, and pages to free resources. Use `await browser.close()` or async disposal.
+</Warning>
+
+## Connection Types
+
+Playwright supports multiple connection mechanisms:
+
+### Local Launch
+```javascript
+const browser = await chromium.launch();
+```
+Playwright launches and controls a local browser process.
+
+### Remote Connection
+```javascript
+const browser = await chromium.connect('ws://remote-browser:8080');
+```
+Connect to a browser running elsewhere (useful for distributed testing).
+
+### Persistent Context
+```javascript
+const context = await chromium.launchPersistentContext('./user-data');
+```
+Launch with saved user data (cookies, storage, etc.).
+
+## Performance Considerations
+
+1. **Context Reuse** - Contexts are cheaper than browsers. Reuse browsers across tests.
+2. **Parallel Execution** - Multiple contexts can run in parallel within one browser.
+3. **Connection Pooling** - The channel protocol is optimized for low latency.
+4. **Event Subscription** - Events are only sent when listeners are attached (client/browserContext.ts:166-173).
+
+## Implementation Details
+
+### Channel Ownership
+
+From client/channelOwner.ts, every Playwright object extends `ChannelOwner`:
+
+```typescript
+export class ChannelOwner<T> {
+  readonly _connection: Connection;
+  readonly _channel: T;
+  readonly _guid: string;
+  
+  _wrapApiCall<R>(func: () => Promise<R>, options: WrapOptions): Promise<R> {
+    // Wraps every API call with instrumentation, logging, and error handling
+  }
+}
+```
+
+This provides:
+- Automatic error conversion
+- Stack trace preservation  
+- Logging and tracing
+- Instrumentation hooks
+
+## Browser-Specific Implementations
+
+Each browser has its own server-side implementation:
+- **Chromium** - Uses Chrome DevTools Protocol (CDP)
+- **Firefox** - Uses Juggler protocol
+- **WebKit** - Uses WebKit Inspector Protocol
+
+The client API remains the same across all browsers, providing true cross-browser compatibility.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Browsers" icon="browser" href="./browsers">
+    Learn about browser types and launching
+  </Card>
+  <Card title="Browser Contexts" icon="window-restore" href="./browser-contexts">
+    Understanding isolated browser sessions
+  </Card>
+  <Card title="Pages and Frames" icon="file" href="./pages-and-frames">
+    Working with pages and iframes
+  </Card>
+  <Card title="Selectors" icon="crosshairs" href="./selectors">
+    Element selection strategies
+  </Card>
+</CardGroup>

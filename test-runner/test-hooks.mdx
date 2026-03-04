@@ -1,0 +1,493 @@
+---
+title: 'Test Hooks'
+description: 'Learn how to use beforeEach, afterEach, beforeAll, and afterAll hooks in Playwright Test'
+---
+
+## Introduction
+
+Test hooks allow you to set up and tear down test environments. Playwright provides four types of hooks that run at different stages of the test lifecycle.
+
+## Hook Types
+
+From `src/common/test.ts:50` and `src/common/testType.ts:52-55`:
+
+```typescript
+type Hook = {
+  type: 'beforeEach' | 'afterEach' | 'beforeAll' | 'afterAll';
+  fn: Function;
+  title: string;
+  location: Location;
+};
+```
+
+### beforeEach
+
+Runs before each test in the describe block:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Todo tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('https://demo.playwright.dev/todomvc');
+    await page.locator('.new-todo').fill('Buy milk');
+    await page.locator('.new-todo').press('Enter');
+  });
+  
+  test('should show todo', async ({ page }) => {
+    await expect(page.locator('.todo-list li')).toHaveCount(1);
+  });
+  
+  test('should complete todo', async ({ page }) => {
+    await page.locator('.toggle').check();
+    await expect(page.locator('.completed')).toHaveCount(1);
+  });
+});
+```
+
+### afterEach
+
+Runs after each test in the describe block:
+
+```typescript
+test.describe('Database tests', () => {
+  test.afterEach(async ({ page }) => {
+    // Clean up after each test
+    await page.evaluate(() => localStorage.clear());
+  });
+  
+  test('test 1', async ({ page }) => {
+    // Test implementation
+  });
+  
+  test('test 2', async ({ page }) => {
+    // Test implementation
+  });
+});
+```
+
+### beforeAll
+
+Runs once before all tests in the describe block:
+
+```typescript
+test.describe('API tests', () => {
+  let apiToken: string;
+  
+  test.beforeAll(async ({ request }) => {
+    // Setup runs once
+    const response = await request.post('/api/login', {
+      data: { username: 'admin', password: 'admin' },
+    });
+    const data = await response.json();
+    apiToken = data.token;
+  });
+  
+  test('should list users', async ({ request }) => {
+    const response = await request.get('/api/users', {
+      headers: { 'Authorization': `Bearer ${apiToken}` },
+    });
+    expect(response.ok()).toBeTruthy();
+  });
+  
+  test('should create user', async ({ request }) => {
+    const response = await request.post('/api/users', {
+      headers: { 'Authorization': `Bearer ${apiToken}` },
+      data: { name: 'John' },
+    });
+    expect(response.ok()).toBeTruthy();
+  });
+});
+```
+
+<Warning>
+`beforeAll` and `afterAll` hooks have limited fixture support. They cannot use test-scoped fixtures like `page` and `context`.
+</Warning>
+
+### afterAll
+
+Runs once after all tests in the describe block:
+
+```typescript
+test.describe('Resource cleanup', () => {
+  test.afterAll(async ({ request }) => {
+    // Cleanup runs once after all tests
+    await request.delete('/api/test-data');
+  });
+  
+  test('test 1', async ({ page }) => {});
+  test('test 2', async ({ page }) => {});
+});
+```
+
+## Hook Execution Order
+
+From `src/common/testType.ts:174-184`:
+
+```typescript
+test.describe('Outer suite', () => {
+  test.beforeAll(() => console.log('Outer beforeAll'));
+  test.beforeEach(() => console.log('Outer beforeEach'));
+  test.afterEach(() => console.log('Outer afterEach'));
+  test.afterAll(() => console.log('Outer afterAll'));
+  
+  test('outer test', () => console.log('Outer test'));
+  
+  test.describe('Inner suite', () => {
+    test.beforeAll(() => console.log('Inner beforeAll'));
+    test.beforeEach(() => console.log('Inner beforeEach'));
+    test.afterEach(() => console.log('Inner afterEach'));
+    test.afterAll(() => console.log('Inner afterAll'));
+    
+    test('inner test', () => console.log('Inner test'));
+  });
+});
+
+// Execution order:
+// Outer beforeAll
+// Outer beforeEach
+// Outer test
+// Outer afterEach
+// Inner beforeAll
+// Outer beforeEach
+// Inner beforeEach
+// Inner test
+// Inner afterEach
+// Outer afterEach
+// Inner afterAll
+// Outer afterAll
+```
+
+## Hook Titles
+
+From `src/common/testType.ts:174-184`:
+
+You can provide descriptive titles for hooks:
+
+```typescript
+test.beforeEach('setup test data', async ({ page }) => {
+  await page.goto('/setup');
+});
+
+test.afterEach('cleanup test data', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.clear());
+});
+```
+
+Without a title, the default is `"${hookType} hook"`:
+
+```typescript
+test.beforeEach(async ({ page }) => {
+  // Title: "beforeEach hook"
+});
+```
+
+## Hooks with Fixtures
+
+Hooks can use fixtures just like tests:
+
+```typescript
+type MyFixtures = {
+  todoPage: TodoPage;
+};
+
+const test = base.extend<MyFixtures>({
+  todoPage: async ({ page }, use) => {
+    const todoPage = new TodoPage(page);
+    await use(todoPage);
+  },
+});
+
+test.describe('Todo tests', () => {
+  test.beforeEach(async ({ todoPage }) => {
+    await todoPage.goto();
+    await todoPage.addDefaultTodos();
+  });
+  
+  test('should display todos', async ({ todoPage }) => {
+    await expect(todoPage.items).toHaveCount(3);
+  });
+});
+```
+
+## Fixture Limitations in beforeAll/afterAll
+
+From `src/index.ts:357-364`:
+
+`beforeAll` and `afterAll` cannot use test-scoped fixtures:
+
+```typescript
+test.describe('Invalid usage', () => {
+  test.beforeAll(async ({ page }) => {
+    // ERROR: Cannot use 'page' in beforeAll
+  });
+});
+```
+
+**Valid fixtures for beforeAll/afterAll:**
+- Worker-scoped fixtures: `browser`, `browserName`, `request`
+- Custom worker-scoped fixtures
+
+```typescript
+test.describe('Valid usage', () => {
+  test.beforeAll(async ({ browser }) => {
+    // OK: browser is worker-scoped
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('/setup');
+    await context.close();
+  });
+});
+```
+
+## Hook Error Handling
+
+If a hook fails, subsequent hooks and tests are affected:
+
+### beforeEach Failure
+
+```typescript
+test.beforeEach(async ({ page }) => {
+  await page.goto('/'); // If this fails...
+});
+
+test('test 1', async ({ page }) => {
+  // This test is marked as failed and skipped
+});
+
+test.afterEach(async ({ page }) => {
+  // This still runs for cleanup
+});
+```
+
+### beforeAll Failure
+
+```typescript
+test.beforeAll(async ({ request }) => {
+  await request.post('/api/setup'); // If this fails...
+});
+
+test('test 1', async ({ page }) => {
+  // All tests in this suite are skipped
+});
+
+test('test 2', async ({ page }) => {
+  // Skipped
+});
+
+test.afterAll(async ({ request }) => {
+  // This still runs
+});
+```
+
+## Shared State Between Hooks
+
+Use describe block scope to share state:
+
+```typescript
+test.describe('Shared state', () => {
+  let userId: string;
+  
+  test.beforeAll(async ({ request }) => {
+    const response = await request.post('/api/users', {
+      data: { name: 'Test User' },
+    });
+    const data = await response.json();
+    userId = data.id;
+  });
+  
+  test('use shared data', async ({ request }) => {
+    const response = await request.get(`/api/users/${userId}`);
+    expect(response.ok()).toBeTruthy();
+  });
+  
+  test.afterAll(async ({ request }) => {
+    await request.delete(`/api/users/${userId}`);
+  });
+});
+```
+
+## Hook Scope and Nesting
+
+Hooks are scoped to their describe block and nested blocks:
+
+```typescript
+test.describe('Parent', () => {
+  test.beforeEach(async ({ page }) => {
+    console.log('Parent beforeEach');
+  });
+  
+  test('parent test', async ({ page }) => {});
+  // Runs: Parent beforeEach -> parent test
+  
+  test.describe('Child', () => {
+    test.beforeEach(async ({ page }) => {
+      console.log('Child beforeEach');
+    });
+    
+    test('child test', async ({ page }) => {});
+    // Runs: Parent beforeEach -> Child beforeEach -> child test
+  });
+});
+```
+
+## Conditional Hooks
+
+You can conditionally run hooks:
+
+```typescript
+test.describe('Conditional setup', () => {
+  test.beforeEach(async ({ page, browserName }) => {
+    if (browserName === 'chromium') {
+      await page.addInitScript(() => {
+        // Chromium-specific setup
+      });
+    }
+  });
+});
+```
+
+## Hooks with TestInfo
+
+Access test metadata in hooks:
+
+```typescript
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== 'passed') {
+    // Take screenshot on failure
+    const screenshot = await page.screenshot();
+    await testInfo.attach('failure-screenshot', {
+      body: screenshot,
+      contentType: 'image/png',
+    });
+  }
+});
+```
+
+## Hooks vs Fixtures
+
+Choose between hooks and fixtures based on your needs:
+
+**Use Hooks When:**
+- Setup affects multiple tests
+- Need to run code once per suite (beforeAll/afterAll)
+- Want explicit setup/teardown in test file
+- Sharing state between tests
+
+**Use Fixtures When:**
+- Setup is reusable across files
+- Need automatic cleanup
+- Want dependency injection
+- Creating page objects or utilities
+
+### Hook Example
+
+```typescript
+test.describe('Login flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('[name=username]', 'user');
+    await page.fill('[name=password]', 'pass');
+    await page.click('button[type=submit]');
+  });
+});
+```
+
+### Fixture Example
+
+```typescript
+const test = base.extend({
+  authenticatedPage: async ({ page }, use) => {
+    await page.goto('/login');
+    await page.fill('[name=username]', 'user');
+    await page.fill('[name=password]', 'pass');
+    await page.click('button[type=submit]');
+    await use(page);
+  },
+});
+
+test('dashboard', async ({ authenticatedPage }) => {
+  // Already logged in
+});
+```
+
+## Best Practices
+
+1. **Keep hooks focused**: Each hook should have a single responsibility
+2. **Use beforeAll sparingly**: Can lead to test interdependence
+3. **Always clean up**: Use afterEach/afterAll for cleanup
+4. **Handle errors gracefully**: Add try-catch for cleanup code
+5. **Consider fixtures**: For reusable setup across files
+6. **Use descriptive titles**: Make hooks easier to understand in reports
+7. **Avoid shared mutable state**: Can cause flaky tests
+
+## Common Patterns
+
+### Authentication Setup
+
+```typescript
+test.describe('Authenticated tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('[name=email]', 'user@example.com');
+    await page.fill('[name=password]', 'password');
+    await page.click('button[type=submit]');
+    await page.waitForURL('/dashboard');
+  });
+});
+```
+
+### Database Seeding
+
+```typescript
+test.describe('User management', () => {
+  test.beforeAll(async ({ request }) => {
+    await request.post('/api/seed', {
+      data: { users: 10, posts: 50 },
+    });
+  });
+  
+  test.afterAll(async ({ request }) => {
+    await request.post('/api/reset');
+  });
+});
+```
+
+### Browser Context Configuration
+
+```typescript
+test.describe('Geolocation tests', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.setGeolocation({
+      latitude: 37.7749,
+      longitude: -122.4194,
+    });
+    await context.grantPermissions(['geolocation']);
+  });
+});
+```
+
+### Test Isolation
+
+```typescript
+test.describe('Storage tests', () => {
+  test.afterEach(async ({ page }) => {
+    // Clear storage after each test
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Test Fixtures" icon="puzzle-piece" href="/test-runner/test-fixtures">
+    Learn about the fixture system
+  </Card>
+  <Card title="Parallelization" icon="layer-group" href="/test-runner/parallelization">
+    Run tests in parallel
+  </Card>
+</CardGroup>
